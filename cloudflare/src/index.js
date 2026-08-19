@@ -5,7 +5,7 @@ const SOURCES = [
     url: "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026",
     radius: 950,
     triggers: ["classificacao", "resultado", "homolog", "convoca", "nomea", "posse", "reclassifica", "assistente-tecnico de gestao"],
-    groups: []
+    groups: [["assistente-tecnico de gestao", "02/2026", "concurso 02/2026"]]
   },
   {
     id: "sv_ibam",
@@ -13,7 +13,7 @@ const SOURCES = [
     url: "https://www.ibamsp-concursos.org.br/informacoes/134/",
     radius: 950,
     triggers: ["classificacao", "resultado", "homolog", "convoca", "nomea", "assistente-tecnico de gestao"],
-    groups: []
+    groups: [["sao vicente"], ["02/2026", "02-2026"]]
   },
   {
     id: "sv_conv",
@@ -271,7 +271,7 @@ async function run(env) {
     try {
       const r = await fetch(source.url, {
         headers: {
-          "user-agent": "ConcursosWatch-CF/3.0",
+          "user-agent": "ConcursosWatch-CF/4.0",
           "accept-language": "pt-BR,pt;q=0.9",
           "cache-control": "no-cache"
         }
@@ -279,18 +279,26 @@ async function run(env) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const html = await r.text();
       const chunks = relevantChunks(source, html, env);
-      const sigs = [];
-      for (const chunk of chunks) sigs.push(await hash(chunk));
-      sigs.sort();
+      const entries = [];
+      for (const chunk of chunks) {
+        entries.push({sig: await hash(chunk), chunk});
+      }
+      entries.sort((a, b) => a.sig.localeCompare(b.sig));
+      const sigs = entries.map((entry) => entry.sig);
 
       if (Array.isArray(old.sigs)) {
         const prev = new Set(old.sigs);
-        const added = sigs.filter((sig) => !prev.has(sig));
-        if (added.length) {
-          const priority = priorityTerms(env).length && chunks.some((c) => anyMatch(c, priorityTerms(env)));
+        const addedEntries = entries.filter((entry) => !prev.has(entry.sig));
+        if (addedEntries.length) {
+          const pterms = priorityTerms(env);
+          const priority = pterms.length > 0 && addedEntries.some((entry) => anyMatch(entry.chunk, pterms));
+          const sample = addedEntries
+            .slice(0, 2)
+            .map((entry) => `• ${entry.chunk.slice(0, 700)}`)
+            .join("\n\n");
           alerts.push([
             priority ? `[CF] PRIORIDADE — ${source.label}` : `[CF] NOVIDADE — ${source.label}`,
-            `🚨 Cloudflare detectou conteúdo relevante novo.\n${source.url}`
+            `🚨 Cloudflare detectou conteúdo relevante novo.\n\n${sample}\n\n${source.url}`
           ]);
         }
       }
