@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "sources": {
+    "sv_ibam_02_2026": [
+      {
+        "label": "23 — Edital de Divulgação da Classificação Final",
+        "url": "https://anexos-r2.selecao.net.br/uploads/810/concursos/134/anexos/77a4a4c5-274e-4efe-bb06-acf1ef0ba31e.pdf",
+        "stage": "classificacao_final"
+      },
+      {
+        "label": "24 — Despacho de Homologação Parcial",
+        "url": "https://anexos-r2.selecao.net.br/uploads/810/concursos/134/anexos/f88b5ba9-d779-4130-af51-695b13e24dfc.pdf",
+        "stage": "homologacao_parcial"
+      }
+    ]
+  }
+}
