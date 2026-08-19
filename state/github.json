@@ -47,7 +47,7 @@
     "transport": "direct"
   },
   "sv_ibam_02_2026": {
-    "failures": 1,
+    "failures": 2,
     "last_error": "fallback Reader falhou/foi rejeitado para https://www.ibamsp-concursos.org.br/informacoes/134/: Reader respondeu, mas não comprovou a identidade da página oficial (grupos encontrados=[[], [], []])",
     "resolved_url": "https://www.ibamsp-concursos.org.br/informacoes/134/",
     "last_status": 200,
