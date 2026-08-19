@@ -83,7 +83,9 @@ jobs:
             echo "deep_audit.py não gerou state/deep.json"
             exit 1
           fi
-          if git diff --quiet -- state/deep.json; then
+          # `git diff` ignora arquivo novo/untracked. `git status --porcelain`
+          # detecta tanto o primeiro baseline quanto alterações posteriores.
+          if [[ -z "$(git status --porcelain -- state/deep.json)" ]]; then
             echo "Sem mudança no estado profundo."
             exit 0
           fi
