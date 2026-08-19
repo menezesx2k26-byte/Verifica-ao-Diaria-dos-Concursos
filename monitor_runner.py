@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Runtime wrapper for resilient, explicitly-scoped HTTP transports.
+"""Runtime wrapper for resilient transports and independent alert delivery.
 
 Direct HTTP is always attempted first. A public Reader proxy is used only for
 allow-listed official hosts when the origin blocks the GitHub runner. The proxy
 must prove that it actually returned the expected official page before its
 response is accepted; a generic WAF/error page can never clear a source failure.
+
+The wrapper also augments the core alert fan-out with optional Gmail SMTP. That
+keeps a personal mailbox path independent of Resend and Cloudflare Email.
 """
 from __future__ import annotations
 
@@ -17,6 +20,7 @@ from urllib.parse import urlparse
 import requests
 
 import monitor
+from smtp_alert import augment_notify
 
 READER_FALLBACK_HOSTS = {
     "ibamsp-concursos.org.br",
@@ -40,6 +44,7 @@ FALLBACK_META: dict[str, dict[str, object]] = {}
 _direct_fetch = monitor.fetch
 _direct_inspect_document = monitor.inspect_document
 _direct_check_source = monitor.check_source
+_direct_notify = monitor.notify
 
 
 def _allowed(url: str) -> bool:
@@ -186,6 +191,7 @@ def check_source_with_transport(source, old):
 monitor.fetch = fetch_with_fallback
 monitor.inspect_document = inspect_document_with_fallback
 monitor.check_source = check_source_with_transport
+monitor.notify = augment_notify(_direct_notify)
 
 if __name__ == "__main__":
     raise SystemExit(monitor.main(sys.argv[1:]))
