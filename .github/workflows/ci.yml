@@ -71,6 +71,25 @@ jobs:
           assert search_probe.relevant_contexts(sections[0], probe)
           assert not search_probe.official_sections("Title: blog aleatório", probe["official_marker"])
 
+          semantic_source = {
+              "document_require_groups": [
+                  ["assistente tecnico de gestao", "02/2026"],
+                  ["homolog"]
+              ]
+          }
+          facts = deep_audit.semantic_facts(
+              "CONCURSO PÚBLICO 02/2026 — ASSISTENTE TÉCNICO DE GESTÃO — HOMOLOGAÇÃO PARCIAL",
+              semantic_source,
+          )
+          assert facts["assistente_tecnico_gestao"] is True
+          assert facts["concurso_02_2026"] is True
+          assert facts["homologacao"] is True
+          assert facts["source_match"] is True
+          assert isinstance(facts["priority_match"], bool)
+          assert set(facts).issuperset({
+              "classificacao_final", "convocacao", "nomeacao", "posse", "reclassificacao"
+          })
+
           with open("config/deep_seeds.json", encoding="utf-8") as f:
               deep_seeds = json.load(f)
           seed_docs = deep_seeds["sources"]["sv_ibam_02_2026"]
@@ -90,7 +109,7 @@ jobs:
               with open(path, encoding="utf-8") as f:
                   json.load(f)
               print("JSON OK:", path)
-          print("transport + state integrity + smtp + search probe + deep seeds OK")
+          print("transport + state integrity + smtp + search probe + deep semantics OK")
           PY
 
       - name: Validar bootstrap PowerShell
