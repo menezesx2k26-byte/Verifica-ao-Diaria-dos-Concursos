@@ -26,6 +26,26 @@
         "assistente-técnico de gestão",
         "assistente tecnico de gestao"
       ],
+      "bootstrap_critical_terms": [
+        "classificação final",
+        "classificacao final",
+        "homologação",
+        "homologacao",
+        "nomeação",
+        "nomeacao",
+        "convocação para posse",
+        "convocacao para posse",
+        "exames admissionais",
+        "entrega de documentos"
+      ],
+      "document_discovery_groups": [
+        [
+          "concurso-no-02-2026",
+          "cp-02-2026",
+          "cp-02-26",
+          "02/2026"
+        ]
+      ],
       "document_require_groups": [
         [
           "assistente-técnico de gestão",
@@ -61,6 +81,27 @@
         "assistente-técnico de gestão",
         "assistente tecnico de gestao"
       ],
+      "bootstrap_critical_terms": [
+        "classificação final",
+        "classificacao final",
+        "homologação",
+        "homologacao",
+        "nomeação",
+        "nomeacao",
+        "convocação para posse",
+        "convocacao para posse"
+      ],
+      "document_discovery_any": [
+        "edital",
+        "resultado",
+        "classificação",
+        "classificacao",
+        "retificação",
+        "retificacao",
+        "convocação",
+        "convocacao",
+        "homolog"
+      ],
       "document_require_groups": [
         [
           "assistente-técnico de gestão",
@@ -90,7 +131,20 @@
         "posse",
         "reclassifica"
       ],
+      "bootstrap_critical_terms": [
+        "assistente-técnico de gestão",
+        "assistente tecnico de gestao",
+        "02/2026"
+      ],
       "require_groups": [
+        [
+          "assistente-técnico de gestão",
+          "assistente tecnico de gestao",
+          "02/2026",
+          "concurso 02/2026"
+        ]
+      ],
+      "document_discovery_groups": [
         [
           "assistente-técnico de gestão",
           "assistente tecnico de gestao",
@@ -172,6 +226,15 @@
         "classificação",
         "classificacao"
       ],
+      "bootstrap_critical_terms": [
+        "convocação",
+        "convocacao",
+        "nomeação",
+        "nomeacao",
+        "posse",
+        "exame admissional",
+        "entrega de documentos"
+      ],
       "require_groups": [
         [
           "004/2024",
@@ -182,6 +245,15 @@
           "agente comunitário de saúde",
           "agente comunitario de saude",
           "ACS"
+        ]
+      ],
+      "document_discovery_groups": [
+        [
+          "004/2024",
+          "004-2024",
+          "004 2024",
+          "agente comunitário de saúde",
+          "agente comunitario de saude"
         ]
       ],
       "document_require_groups": [

@@ -29,10 +29,11 @@ DEFAULT_CONTEXT_RADIUS = 650
 MAX_PDF_BYTES = 20_000_000
 MAX_HTML_BYTES = 8_000_000
 MAX_ALERTS = 16
+PARSER_VERSION = 4
 
 S = requests.Session()
 S.headers.update({
-    "User-Agent": "ConcursosWatch/3.0 (+personal public-notice monitor)",
+    "User-Agent": "ConcursosWatch/4.0 (+personal public-notice monitor)",
     "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.5",
     "Cache-Control": "no-cache",
 })
@@ -99,17 +100,38 @@ def fetch(url: str, *, binary: bool = False) -> requests.Response:
     raise RuntimeError(f"falha ao buscar {url}: {last}")
 
 
+def choose_content_scope(soup: BeautifulSoup):
+    selectors = (
+        "main",
+        "#content-core",
+        "#content",
+        "#conteudo",
+        "article",
+        "[role='main']",
+    )
+    for selector in selectors:
+        candidate = soup.select_one(selector)
+        if not candidate:
+            continue
+        text = candidate.get_text(" ", strip=True)
+        links = candidate.find_all("a", href=True)
+        if len(text) >= 250 and len(links) >= 1:
+            return candidate
+    return soup
+
+
 def page_data(raw: str, base_url: str) -> tuple[str, list[dict[str, str]]]:
     soup = BeautifulSoup(raw, "html.parser")
     for node in soup(["script", "style", "noscript", "svg"]):
         node.decompose()
+    scope = choose_content_scope(soup)
     links: list[dict[str, str]] = []
-    for a in soup.find_all("a", href=True):
+    for a in scope.find_all("a", href=True):
         href = urljoin(base_url, a.get("href"))
         title = " ".join(a.stripped_strings)
         parent = " ".join(a.parent.stripped_strings) if a.parent else title
         links.append({"href": href, "title": title[:500], "context": parent[:2200]})
-    return soup.get_text(" ", strip=True), links
+    return scope.get_text(" ", strip=True), links
 
 
 def contexts(text: str, keywords: list[str], radius: int = DEFAULT_CONTEXT_RADIUS) -> list[str]:
@@ -358,12 +380,50 @@ def check_cloudflare_health(stale_minutes: int) -> str | None:
     return None
 
 
+def link_text(item: dict[str, str]) -> str:
+    return f"{item.get('title', '')} {item.get('context', '')} {item.get('href', '')}"
+
+
+def discover_document(item: dict[str, str], source: dict[str, Any]) -> bool:
+    if not is_document(item["href"]):
+        return False
+    combined = link_text(item)
+    groups = source.get("document_discovery_groups")
+    if groups and not groups_match(combined, groups):
+        return False
+    terms = source.get("document_discovery_any")
+    if terms and not any_match(combined, terms):
+        return False
+    return True
+
+
 def link_candidate_matches(item: dict[str, str], source: dict[str, Any]) -> bool:
-    combined = f"{item.get('title', '')} {item.get('context', '')} {item.get('href', '')}"
+    combined = link_text(item)
     if priority_terms() and any_match(combined, priority_terms()):
         return True
     groups = source.get("document_link_require_groups") or source.get("document_require_groups")
     return groups_match(combined, groups) and any_match(combined, source_trigger_terms(source))
+
+
+def bootstrap_critical_event(text: str, links: list[dict[str, str]], source: dict[str, Any]) -> tuple[str, str] | None:
+    terms = list(source.get("bootstrap_critical_terms") or [])
+    if not terms:
+        return None
+    candidates: list[str] = []
+    for item in links:
+        combined = link_text(item)
+        if any_match(combined, terms):
+            candidates.append(combined)
+    for ctx in contexts(text, terms, radius=850):
+        if groups_match(ctx, source.get("require_groups")):
+            candidates.append(ctx)
+    if not candidates:
+        return None
+    sample = "\n\n".join(f"• {fold(x)[:900]}" for x in candidates[:4])
+    return (
+        f"AUDITORIA INICIAL — {source['label']}",
+        f"🔎 O primeiro baseline já contém ato(s) de estágio crítico. Confira para não absorver silenciosamente uma publicação pré-existente.\n\n{sample}\n\nFonte: {source['url']}",
+    )
 
 
 def check_source(source: dict[str, Any], old: dict[str, Any]) -> tuple[dict[str, Any], list[tuple[str, str]]]:
@@ -373,14 +433,27 @@ def check_source(source: dict[str, Any], old: dict[str, Any]) -> tuple[dict[str,
     mode = source.get("mode", "page_context")
     events: list[tuple[str, str]] = []
     new = dict(old)
-    new.update({"failures": 0, "resolved_url": r.url, "last_status": r.status_code})
+    parser_is_current = int(old.get("parser_version", 0)) == PARSER_VERSION
+    had_baseline = "context_sigs" in old or "document_urls" in old or "parser_version" in old
+    first_ever_baseline = not had_baseline
+    new.update({
+        "failures": 0,
+        "resolved_url": r.url,
+        "last_status": r.status_code,
+        "parser_version": PARSER_VERSION,
+    })
     if old.get("failures", 0):
         events.append((f"RECUPERADO — {label}", f"✅ A fonte voltou a responder.\n{source['url']}"))
+
+    if first_ever_baseline:
+        bootstrap = bootstrap_critical_event(text, links, source)
+        if bootstrap:
+            events.append(bootstrap)
 
     if mode in {"page_context", "hybrid"}:
         ctxs = relevant_contexts(text, source)
         sigs = sorted(digest(x) for x in ctxs)
-        if "context_sigs" in old:
+        if parser_is_current and "context_sigs" in old:
             previous = set(old["context_sigs"])
             added = [x for x in ctxs if digest(x) not in previous]
             if added:
@@ -397,10 +470,10 @@ def check_source(source: dict[str, Any], old: dict[str, Any]) -> tuple[dict[str,
     if mode in {"documents", "hybrid"}:
         docs: dict[str, dict[str, str]] = {}
         for item in links:
-            if is_document(item["href"]):
+            if discover_document(item, source):
                 docs[item["href"]] = item
         urls = sorted(docs)
-        if "document_urls" in old:
+        if parser_is_current and "document_urls" in old:
             previous = set(old["document_urls"])
             for url in [u for u in urls if u not in previous][:12]:
                 item = docs[url]
@@ -473,6 +546,10 @@ def self_test() -> int:
     assert not groups_match("concurso 004/2024 professor", [["agente comunitario de saude"]])
     assert contexts("abc convocação xyz", ["convocação"], 10)
     assert len(event_id("a", "b")) == 12
+    fake = {"href": "https://x/concursos/02-2026/23-edital.pdf", "title": "Classificação final", "context": "CP 02/2026"}
+    assert discover_document(fake, {"document_discovery_groups": [["02/2026", "02-2026"]]})
+    noise = {"href": "https://x/licitacoes/publicacao.pdf", "title": "Pregão", "context": "licitação"}
+    assert not discover_document(noise, {"document_discovery_groups": [["02/2026", "02-2026"]]})
     print("[SELF-TEST] OK")
     return 0
 
@@ -536,8 +613,6 @@ def main(argv: list[str] | None = None) -> int:
             "🧪 Teste manual do Concursos Watch. Se esta mensagem chegou por mais de um canal, a redundância de entrega está funcionando.",
         ))
 
-    # Persiste a detecção antes das notificações para evitar alertas duplicados em caso
-    # de falha isolada de Telegram/e-mail após a fonte já ter sido processada.
     save(STATE, state)
 
     for subject, body in events[:MAX_ALERTS]:
