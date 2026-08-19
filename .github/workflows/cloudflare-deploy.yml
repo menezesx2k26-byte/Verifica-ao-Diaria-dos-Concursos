@@ -117,7 +117,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- config/runtime.json; then
+          if [[ ! -f config/runtime.json ]]; then
+            echo "discover-url.mjs não gerou config/runtime.json"
+            exit 1
+          fi
+          if [[ -z "$(git status --porcelain -- config/runtime.json)" ]]; then
             echo "runtime.json já está atualizado."
             exit 0
           fi

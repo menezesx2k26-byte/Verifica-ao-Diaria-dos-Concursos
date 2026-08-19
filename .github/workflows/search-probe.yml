@@ -57,7 +57,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f state/search.json ]] || git diff --quiet -- state/search.json; then
+          if [[ ! -f state/search.json ]]; then
+            echo "Sensor desativado/sem estado (por exemplo, JINA_API_KEY ausente)."
+            exit 0
+          fi
+          if [[ -z "$(git status --porcelain -- state/search.json)" ]]; then
             echo "Sem novo estado para persistir."
             exit 0
           fi
