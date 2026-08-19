@@ -14,11 +14,14 @@ priority terms.
 """
 from __future__ import annotations
 
+import html as html_lib
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin, urlparse, urlunparse
 
 # Importing the wrapper installs direct->Reader fallback and augmented alerts.
 import monitor_runner as transports
@@ -28,7 +31,7 @@ DEEP_STATE = Path(os.getenv("WATCH_DEEP_STATE", "state/deep.json"))
 SEEDS_CONFIG = Path(os.getenv("WATCH_DEEP_SEEDS", "config/deep_seeds.json"))
 DEFAULT_PER_SOURCE = 6
 MAX_EVENTS = 10
-AUDIT_VERSION = 4
+AUDIT_VERSION = 5
 
 SEMANTIC_TERMS: dict[str, list[str]] = {
     "assistente_tecnico_gestao": [
@@ -54,12 +57,9 @@ SEMANTIC_TERMS: dict[str, list[str]] = {
         "classificação final",
         "classificacao final",
     ],
-    "homologacao": [
-        "homologação",
-        "homologacao",
-        "homologado",
-        "homologada",
-    ],
+    # Prefix catches homologação/homologo/homologado/homologar and avoids
+    # depending on one grammatical form used by the authority.
+    "homologacao": ["homolog"],
     "convocacao": [
         "convocação",
         "convocacao",
@@ -86,16 +86,70 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def extract_document_text(url: str) -> str:
+def audit_content_url(url: str) -> str:
+    """Map known public viewer URLs to the underlying document when deterministic."""
+    parsed = urlparse(url)
+    path = parsed.path
+    if path.casefold().endswith(".pdf/view"):
+        parsed = parsed._replace(path=path[:-5])
+        return urlunparse(parsed)
+    return url
+
+
+def embedded_document_urls(html: str, base_url: str) -> list[str]:
+    """Return HTTP(S) iframe/embed targets, preserving order and deduplicating."""
+    values = re.findall(
+        r"(?is)<(?:iframe|embed)\b[^>]*?\bsrc\s*=\s*['\"]([^'\"]+)['\"]",
+        html,
+    )
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        absolute = urljoin(base_url, html_lib.unescape(raw.strip()))
+        parsed = urlparse(absolute)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            continue
+        if absolute not in seen:
+            seen.add(absolute)
+            out.append(absolute)
+    return out[:4]
+
+
+def response_text(r, requested_url: str) -> str:
+    ctype = (r.headers.get("content-type") or "").casefold()
+    effective = (getattr(r, "url", None) or requested_url).casefold().split("?")[0]
+    if "pdf" in ctype or effective.endswith(".pdf"):
+        return monitor.pdf_text(r.content)
+    text, _ = monitor.page_data(r.text, getattr(r, "url", requested_url))
+    return text
+
+
+def extract_document_text(url: str) -> tuple[str, str]:
+    target = audit_content_url(url)
     try:
-        r = monitor.fetch(url, binary=True)
+        r = monitor.fetch(target, binary=True)
+        text = response_text(r, target)
+
+        # Some gazettes expose a short viewer page whose actual document lives in
+        # an iframe/embed. Prefer a sufficiently richer embedded target when one
+        # exists, instead of fingerprinting the decorative viewer shell.
         ctype = (r.headers.get("content-type") or "").casefold()
-        if "pdf" in ctype or url.casefold().split("?")[0].endswith(".pdf"):
-            text = monitor.pdf_text(r.content)
-        else:
-            text, _ = monitor.page_data(r.text, r.url)
+        if "html" in ctype and hasattr(r, "text"):
+            base_text_len = len(monitor.fold(text))
+            for embedded in embedded_document_urls(r.text, getattr(r, "url", target)):
+                try:
+                    er = monitor.fetch(embedded, binary=True)
+                    candidate = response_text(er, embedded)
+                    candidate_len = len(monitor.fold(candidate))
+                    if candidate_len >= 80 and candidate_len > base_text_len:
+                        text = candidate
+                        target = getattr(er, "url", embedded) or embedded
+                        base_text_len = candidate_len
+                except Exception as exc:
+                    print(f"[DEEP] embed ignorado {embedded}: {exc}")
+
         if len(monitor.fold(text)) >= 80:
-            return text
+            return text, target
     except Exception:
         if not transports._allowed(url):
             raise
@@ -103,7 +157,7 @@ def extract_document_text(url: str) -> str:
     if transports._allowed(url):
         text = transports._reader_markdown(url)
         if len(monitor.fold(text)) >= 80:
-            return text
+            return text, url
     raise RuntimeError("documento sem texto suficiente para fingerprint")
 
 
@@ -189,11 +243,11 @@ def main() -> int:
             if doc.get("seeded"):
                 seeded_count += 1
             try:
-                text = extract_document_text(url)
+                text, content_url = extract_document_text(url)
                 normalized = monitor.fold(text)
                 signature = monitor.digest(normalized)
                 facts = semantic_facts(text, source)
-                new_docs[url] = {
+                entry = {
                     "signature": signature,
                     "checked_at": now_iso(),
                     "chars": len(normalized),
@@ -203,6 +257,9 @@ def main() -> int:
                     "seeded": bool(doc.get("seeded")),
                     "semantic": facts,
                 }
+                if content_url != url:
+                    entry["content_url"] = content_url
+                new_docs[url] = entry
 
                 previous = old.get("signature")
                 if previous and previous != signature:
