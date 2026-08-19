@@ -2,6 +2,13 @@ name: Concursos Watch — GitHub
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "monitor.py"
+      - "config/**"
+      - "requirements.txt"
+      - ".github/workflows/monitor.yml"
   schedule:
     # Fora do minuto 0 para reduzir risco de atraso sob carga.
     - cron: "7,22,37,52 * * * *"
