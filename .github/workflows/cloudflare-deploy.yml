@@ -37,43 +37,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Validar credenciais obrigatórias
+      - name: Preflight de credenciais
+        id: preflight
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Falta secret CLOUDFLARE_API_TOKEN"; exit 2; }
-          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Falta secret CLOUDFLARE_ACCOUNT_ID"; exit 2; }
-          test -n "$WATCHDOG_TOKEN" || { echo "Falta secret WATCHDOG_TOKEN"; exit 2; }
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" || -z "$WATCHDOG_TOKEN" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Cloudflare aguardando secrets::Configure CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID e WATCHDOG_TOKEN e execute este workflow novamente."
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.preflight.outputs.ready == 'true'
+        with:
+          node-version: "20"
 
       - name: Instalar Wrangler
+        if: steps.preflight.outputs.ready == 'true'
         working-directory: cloudflare
         run: npm install --no-audit --no-fund
 
       - name: Criar/reutilizar KV e gerar configuração
+        if: steps.preflight.outputs.ready == 'true'
         working-directory: cloudflare
         run: node scripts/bootstrap.mjs
 
       - name: Preparar secrets do Worker
+        if: steps.preflight.outputs.ready == 'true'
         working-directory: cloudflare
         run: node scripts/secrets.mjs
 
       - name: Validar configuração antes do deploy
+        if: steps.preflight.outputs.ready == 'true'
         working-directory: cloudflare
         run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
 
       - name: Implantar Worker e Cron Triggers
+        if: steps.preflight.outputs.ready == 'true'
         working-directory: cloudflare
         run: npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
 
       - name: Descobrir URL pública do Worker
+        if: steps.preflight.outputs.ready == 'true'
         working-directory: cloudflare
         run: node scripts/discover-url.mjs
 
       - name: Smoke test /health
+        if: steps.preflight.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -88,8 +100,20 @@ jobs:
           echo "Worker implantado, mas /health não respondeu após as tentativas."
           exit 1
 
+      - name: Inicializar baseline e heartbeat Cloudflare
+        if: steps.preflight.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="$(python -c 'import json; print(json.load(open("config/runtime.json"))["cloudflare_url"])')"
+          curl --fail --silent --show-error --max-time 90 \
+            -X POST "$BASE_URL/run" \
+            -H "Authorization: Bearer $WATCHDOG_TOKEN" \
+            -H "Content-Type: application/json"
+          echo
+
       - name: Persistir URL do Worker no repositório
-        if: github.ref == 'refs/heads/main'
+        if: steps.preflight.outputs.ready == 'true' && github.ref == 'refs/heads/main'
         shell: bash
         run: |
           set -euo pipefail
