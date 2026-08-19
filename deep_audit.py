@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Daily deep audit for documents that may be silently replaced at the same URL.
 
-The frequent monitor is optimized for new links and relevant page contexts.  This
+The frequent monitor is optimized for new links and relevant page contexts. This
 second pass deliberately downloads only a small tail of already-known documents
-once per day and fingerprints their normalized textual content.  It catches the
+once per day and fingerprints their normalized textual content. It catches the
 important edge case where a municipality/bank edits or replaces a PDF without
 changing its URL.
 """
@@ -15,13 +15,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Importing the wrapper installs direct->Reader fallback before we use monitor.
+# Importing the wrapper installs direct->Reader fallback and augmented alerts.
 import monitor_runner as transports
 import monitor
 
 DEEP_STATE = Path(os.getenv("WATCH_DEEP_STATE", "state/deep.json"))
 DEFAULT_PER_SOURCE = 6
 MAX_EVENTS = 10
+AUDIT_VERSION = 2
 
 
 def now_iso() -> str:
@@ -129,6 +130,7 @@ def main() -> int:
         }
 
     deep["_meta"] = {
+        "audit_version": AUDIT_VERSION,
         "checked_at": now_iso(),
         "sources": len([k for k in deep if not k.startswith("_")]),
         "failures": failures,
