@@ -9,6 +9,7 @@ on:
       - "monitor_runner.py"
       - "smtp_alert.py"
       - "deep_audit.py"
+      - "search_probe.py"
       - "config/**"
       - "requirements.txt"
       - "cloudflare/**"
@@ -34,23 +35,31 @@ jobs:
 
       - name: Validar Python e JSON
         run: |
-          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py
+          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py
           python monitor.py --self-test
           python - <<'PY'
           import json
           import monitor_runner as tr
           import smtp_alert
+          import search_probe
           assert tr._allowed("https://www.ibamsp-concursos.org.br/informacoes/134/")
           assert not tr._allowed("https://example.com/")
           rendered = tr._markdown_as_html("[Edital](https://example.org/a.pdf)")
           assert 'href="https://example.org/a.pdf"' in rendered
-          # With no SMTP secrets CI must skip the channel without network access.
           assert smtp_alert.send_gmail("teste", "teste") is False
+
+          fake_search = '''Title: IBAM São Vicente\nURL Source: https://www.ibamsp-concursos.org.br/informacoes/134/\nSÃO VICENTE - CONCURSO PÚBLICO - 02/2026\n24- Despacho de Homologação Parcial'''
+          sections = search_probe.official_sections(fake_search, "ibamsp-concursos.org.br/informacoes/134")
+          assert len(sections) == 1
+          probe = search_probe.PROBES[0]
+          assert search_probe.relevant_contexts(sections[0], probe)
+          assert not search_probe.official_sections("Title: blog aleatório", probe["official_marker"])
+
           for path in ("config/sources.json",):
               with open(path, encoding="utf-8") as f:
                   json.load(f)
               print("JSON OK:", path)
-          print("transport wrapper + smtp optional channel OK")
+          print("transport + smtp + search probe OK")
           PY
 
       - uses: actions/setup-node@v4
