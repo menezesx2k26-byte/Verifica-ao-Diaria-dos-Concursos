@@ -9,14 +9,10 @@
     "head_sampling_rate": 1
   },
   "triggers": {
-    "crons": ["2,12,32,42 * * * *"]
-  },
-  "kv_namespaces": [
-    {
-      "binding": "WATCH_STATE",
-      "id": "SUBSTITUA_PELO_ID_DO_KV"
-    }
-  ]
+    "crons": ["2,17,32,47 * * * *"]
+  }
+  // O workflow cloudflare-deploy.yml cria e adiciona automaticamente
+  // o binding WATCH_STATE na primeira implantação.
   // Depois de habilitar Cloudflare Email Service, acrescente:
   // "send_email": [{ "name": "EMAIL" }]
 }
