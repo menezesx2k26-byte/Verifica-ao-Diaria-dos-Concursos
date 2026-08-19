@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Runtime wrapper for transports that should not contaminate the core parser.
+"""Runtime wrapper for resilient, explicitly-scoped HTTP transports.
 
-Direct HTTP is always attempted first.  A public Reader proxy is used only for
-allow-listed official hosts when the origin blocks the GitHub runner.  Alerts
-still identify the official URL as the source; state records which transport
-was necessary.
+Direct HTTP is always attempted first. A public Reader proxy is used only for
+allow-listed official hosts when the origin blocks the GitHub runner. The proxy
+must prove that it actually returned the expected official page before its
+response is accepted; a generic WAF/error page can never clear a source failure.
 """
 from __future__ import annotations
 
 import html
 import re
 import sys
+import time
 from urllib.parse import urlparse
 
 import requests
@@ -22,7 +23,19 @@ READER_FALLBACK_HOSTS = {
     "www.ibamsp-concursos.org.br",
 }
 READER_BASE = "https://r.jina.ai/"
+
+# Every inner list is OR; groups are AND. The proxy response is accepted only
+# when all groups are represented in the returned public content.
+FALLBACK_REQUIRED_GROUPS: dict[str, list[list[str]]] = {
+    "/informacoes/134/": [
+        ["são vicente", "sao vicente"],
+        ["02/2026", "02-2026"],
+        ["concurso público", "concurso publico"],
+    ],
+}
+
 FALLBACK_USED: set[str] = set()
+FALLBACK_META: dict[str, dict[str, object]] = {}
 
 _direct_fetch = monitor.fetch
 _direct_inspect_document = monitor.inspect_document
@@ -33,37 +46,81 @@ def _allowed(url: str) -> bool:
     return (urlparse(url).hostname or "").casefold() in READER_FALLBACK_HOSTS
 
 
+def _required_groups(url: str) -> list[list[str]]:
+    path = urlparse(url).path
+    for prefix, groups in FALLBACK_REQUIRED_GROUPS.items():
+        if path.startswith(prefix):
+            return groups
+    return []
+
+
+def _validate_reader_content(url: str, text: str) -> dict[str, object]:
+    normalized = monitor.fold(text)
+    groups = _required_groups(url)
+    hits: list[list[str]] = []
+    for group in groups:
+        group_hits = [term for term in group if monitor.fold(term) in normalized]
+        hits.append(group_hits)
+    if groups and not all(hits):
+        raise RuntimeError(
+            "Reader respondeu, mas não comprovou a identidade da página oficial "
+            f"(grupos encontrados={hits})"
+        )
+    if len(normalized) < 300:
+        raise RuntimeError(f"Reader devolveu conteúdo insuficiente ({len(normalized)} caracteres)")
+    return {
+        "chars": len(normalized),
+        "identity_groups": [len(x) for x in hits],
+    }
+
+
 def _reader_markdown(url: str) -> str:
     reader_url = READER_BASE + url
     last: Exception | None = None
-    for attempt in range(2):
+    for attempt in range(3):
         try:
             r = requests.get(
                 reader_url,
                 headers={
                     "Accept": "text/plain",
-                    "User-Agent": "ConcursosWatch/5.0 reader-fallback",
+                    "User-Agent": "ConcursosWatch/6.0 reader-fallback",
+                    "X-No-Cache": "true",
+                    "X-Cache-Tolerance": "0",
+                    "X-Target-Selector": "body",
+                    "X-Locale": "pt-BR",
+                    "X-User-Agent": (
+                        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/140.0 Safari/537.36"
+                    ),
+                    "X-Referer": "https://www.ibamsp-concursos.org.br/",
+                    "X-Timeout": "30",
                 },
-                timeout=45,
+                timeout=50,
             )
             r.raise_for_status()
             text = r.text
-            if len(text.strip()) < 100:
-                raise RuntimeError("Reader devolveu conteúdo vazio/curto")
+            meta = _validate_reader_content(url, text)
             FALLBACK_USED.add(url)
-            print(f"[FALLBACK] Reader transport usado para {url}")
+            FALLBACK_META[url] = {
+                **meta,
+                "status": r.status_code,
+                "attempt": attempt + 1,
+            }
+            print(
+                f"[FALLBACK] Reader validado para {url} "
+                f"chars={meta['chars']} attempt={attempt + 1}"
+            )
             return text
         except Exception as exc:
             last = exc
-            if attempt == 0:
-                import time
-                time.sleep(2)
-    raise RuntimeError(f"fallback Reader falhou para {url}: {last}")
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"fallback Reader falhou/foi rejeitado para {url}: {last}")
 
 
 def _markdown_as_html(markdown: str) -> str:
-    # Preserve the complete markdown as text and expose absolute markdown links
-    # as anchors so the existing parser can discover official PDF URLs.
+    # Preserve complete markdown as text and expose absolute markdown links as
+    # anchors so the existing parser can discover official PDF URLs.
     anchors: list[str] = []
     for title, url in re.findall(r"\[([^\]]{1,500})\]\((https?://[^)\s]+)\)", markdown):
         anchors.append(
@@ -92,6 +149,7 @@ def fetch_with_fallback(url: str, *, binary: bool = False):
 
 
 def inspect_document_with_fallback(url: str, source):
+    result = None
     try:
         result = _direct_inspect_document(url, source)
         matched, priority, unreadable, snippet = result
@@ -102,7 +160,8 @@ def inspect_document_with_fallback(url: str, source):
             raise
 
     if not _allowed(url):
-        return matched, priority, unreadable, snippet
+        assert result is not None
+        return result
 
     markdown = _reader_markdown(url)
     matched, priority, snippet = monitor.document_result(markdown, source)
@@ -113,10 +172,14 @@ def check_source_with_transport(source, old):
     before = set(FALLBACK_USED)
     new, events = _direct_check_source(source, old)
     used_now = FALLBACK_USED - before
-    if source.get("url") in FALLBACK_USED or used_now:
+    source_url = source.get("url")
+    if source_url in FALLBACK_USED or used_now:
         new["transport"] = "reader-fallback"
+        if source_url in FALLBACK_META:
+            new["transport_meta"] = FALLBACK_META[source_url]
     else:
         new["transport"] = "direct"
+        new.pop("transport_meta", None)
     return new, events
 
 
