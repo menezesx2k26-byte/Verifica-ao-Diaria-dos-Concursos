@@ -10,10 +10,11 @@ on:
       - "monitor_runner.py"
       - "smtp_alert.py"
       - "config/sources.json"
+      - "config/deep_seeds.json"
       - ".github/workflows/deep-audit.yml"
   schedule:
-    # 09:13 em America/Sao_Paulo (UTC-3 em 2026).
-    - cron: "13 12 * * *"
+    # Auditoria pesada intercalada: 8 execuções/dia, no minuto 13 UTC.
+    - cron: "13 */3 * * *"
 
 permissions:
   contents: write
@@ -39,10 +40,21 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Validar scripts
+      - name: Validar scripts e seeds
         run: |
           python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py
           python monitor.py --self-test
+          python - <<'PY'
+          import json
+          with open("config/deep_seeds.json", encoding="utf-8") as f:
+              data = json.load(f)
+          for sid, docs in data.get("sources", {}).items():
+              assert sid and isinstance(docs, list)
+              urls = [d["url"] for d in docs]
+              assert len(urls) == len(set(urls)), f"seed duplicado em {sid}"
+              assert all(u.startswith("https://") for u in urls)
+          print("deep seeds OK")
+          PY
 
       - name: Auditar documentos conhecidos por conteúdo
         env:
@@ -67,6 +79,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -f state/deep.json ]]; then
+            echo "deep_audit.py não gerou state/deep.json"
+            exit 1
+          fi
           if git diff --quiet -- state/deep.json; then
             echo "Sem mudança no estado profundo."
             exit 0
