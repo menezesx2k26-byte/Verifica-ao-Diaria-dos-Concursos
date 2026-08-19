@@ -2,6 +2,14 @@ name: Concursos Watch — Deep Audit
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "deep_audit.py"
+      - "monitor.py"
+      - "monitor_runner.py"
+      - "config/sources.json"
+      - ".github/workflows/deep-audit.yml"
   schedule:
     # 09:13 em America/Sao_Paulo (UTC-3 em 2026).
     - cron: "13 12 * * *"
