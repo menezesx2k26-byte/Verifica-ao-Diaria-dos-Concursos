@@ -47,8 +47,8 @@
     "transport": "direct"
   },
   "sv_ibam_02_2026": {
-    "failures": 0,
-    "last_error": "falha ao buscar https://www.ibamsp-concursos.org.br/informacoes/134/: 403 Client Error: Forbidden for url: https://www.ibamsp-concursos.org.br/informacoes/134/",
+    "failures": 1,
+    "last_error": "fallback Reader falhou/foi rejeitado para https://www.ibamsp-concursos.org.br/informacoes/134/: Reader respondeu, mas não comprovou a identidade da página oficial (grupos encontrados=[[], [], []])",
     "resolved_url": "https://www.ibamsp-concursos.org.br/informacoes/134/",
     "last_status": 200,
     "parser_version": 4,
