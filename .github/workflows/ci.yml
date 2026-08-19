@@ -28,6 +28,7 @@ jobs:
       - name: Validar Python e JSON
         run: |
           python -m py_compile monitor.py
+          python monitor.py --self-test
           python - <<'PY'
           import json
           for path in ("config/sources.json",):
