@@ -1,0 +1,110 @@
+name: Deploy Cloudflare Watch
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare/**"
+      - ".github/workflows/cloudflare-deploy.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: concursos-watch-cloudflare-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+      NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+      NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+      CF_EMAIL_ENABLED: ${{ vars.CF_EMAIL_ENABLED }}
+      CF_EMAIL_FROM: ${{ secrets.CF_EMAIL_FROM }}
+      CF_EMAIL_TO: ${{ secrets.CF_EMAIL_TO }}
+      CF_WORKER_NAME: concursos-watch-redundante
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: cloudflare/package.json
+
+      - name: Validar credenciais obrigatórias
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Falta secret CLOUDFLARE_API_TOKEN"; exit 2; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Falta secret CLOUDFLARE_ACCOUNT_ID"; exit 2; }
+          test -n "$WATCHDOG_TOKEN" || { echo "Falta secret WATCHDOG_TOKEN"; exit 2; }
+
+      - name: Instalar Wrangler
+        working-directory: cloudflare
+        run: npm install --no-audit --no-fund
+
+      - name: Criar/reutilizar KV e gerar configuração
+        working-directory: cloudflare
+        run: node scripts/bootstrap.mjs
+
+      - name: Preparar secrets do Worker
+        working-directory: cloudflare
+        run: node scripts/secrets.mjs
+
+      - name: Validar configuração antes do deploy
+        working-directory: cloudflare
+        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
+
+      - name: Implantar Worker e Cron Triggers
+        working-directory: cloudflare
+        run: npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
+
+      - name: Descobrir URL pública do Worker
+        working-directory: cloudflare
+        run: node scripts/discover-url.mjs
+
+      - name: Smoke test /health
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="$(python -c 'import json; print(json.load(open("config/runtime.json"))["cloudflare_url"])')"
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --max-time 15 "$BASE_URL/health"; then
+              echo
+              exit 0
+            fi
+            sleep $((attempt * 3))
+          done
+          echo "Worker implantado, mas /health não respondeu após as tentativas."
+          exit 1
+
+      - name: Persistir URL do Worker no repositório
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- config/runtime.json; then
+            echo "runtime.json já está atualizado."
+            exit 0
+          fi
+          git config user.name "concursos-watch[bot]"
+          git config user.email "concursos-watch[bot]@users.noreply.github.com"
+          git add config/runtime.json
+          git commit -m "chore(cloudflare): record deployed worker URL"
+          git push
+
+      - name: Limpar arquivos temporários
+        if: always()
+        shell: bash
+        run: rm -f cloudflare/.secrets.generated.json cloudflare/wrangler.generated.jsonc
