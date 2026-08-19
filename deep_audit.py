@@ -21,7 +21,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
 
 # Importing the wrapper installs direct->Reader fallback and augmented alerts.
 import monitor_runner as transports
@@ -31,7 +31,7 @@ DEEP_STATE = Path(os.getenv("WATCH_DEEP_STATE", "state/deep.json"))
 SEEDS_CONFIG = Path(os.getenv("WATCH_DEEP_SEEDS", "config/deep_seeds.json"))
 DEFAULT_PER_SOURCE = 6
 MAX_EVENTS = 10
-AUDIT_VERSION = 5
+AUDIT_VERSION = 6
 
 SEMANTIC_TERMS: dict[str, list[str]] = {
     "assistente_tecnico_gestao": [
@@ -57,8 +57,6 @@ SEMANTIC_TERMS: dict[str, list[str]] = {
         "classificação final",
         "classificacao final",
     ],
-    # Prefix catches homologação/homologo/homologado/homologar and avoids
-    # depending on one grammatical form used by the authority.
     "homologacao": ["homolog"],
     "convocacao": [
         "convocação",
@@ -86,13 +84,34 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _safe_pdf_target(raw: str) -> str | None:
+    candidate = html_lib.unescape((raw or "").strip())
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return None
+    if not parsed.path.casefold().endswith(".pdf"):
+        return None
+    return candidate
+
+
 def audit_content_url(url: str) -> str:
-    """Map known public viewer URLs to the underlying document when deterministic."""
+    """Map known public viewer URLs to the underlying PDF when deterministic."""
     parsed = urlparse(url)
     path = parsed.path
+
+    # Prefeitura de São Vicente/Plone style: /ato.pdf/view -> /ato.pdf.
     if path.casefold().endswith(".pdf/view"):
         parsed = parsed._replace(path=path[:-5])
         return urlunparse(parsed)
+
+    # PDF.js style used by DIOENET: viewer.php?...&file=https://.../diario.pdf
+    # We only unwrap a fully-qualified HTTP(S) PDF target.
+    if path.casefold().endswith("/viewer.php") or path.casefold().endswith("viewer.php"):
+        for raw in parse_qs(parsed.query).get("file", []):
+            target = _safe_pdf_target(raw)
+            if target:
+                return target
+
     return url
 
 
@@ -131,19 +150,20 @@ def extract_document_text(url: str) -> tuple[str, str]:
         text = response_text(r, target)
 
         # Some gazettes expose a short viewer page whose actual document lives in
-        # an iframe/embed. Prefer a sufficiently richer embedded target when one
-        # exists, instead of fingerprinting the decorative viewer shell.
+        # an iframe/embed. Resolve one more deterministic viewer layer before
+        # fingerprinting so PDF.js HTML never becomes the document fingerprint.
         ctype = (r.headers.get("content-type") or "").casefold()
         if "html" in ctype and hasattr(r, "text"):
             base_text_len = len(monitor.fold(text))
             for embedded in embedded_document_urls(r.text, getattr(r, "url", target)):
                 try:
-                    er = monitor.fetch(embedded, binary=True)
-                    candidate = response_text(er, embedded)
+                    embedded_target = audit_content_url(embedded)
+                    er = monitor.fetch(embedded_target, binary=True)
+                    candidate = response_text(er, embedded_target)
                     candidate_len = len(monitor.fold(candidate))
                     if candidate_len >= 80 and candidate_len > base_text_len:
                         text = candidate
-                        target = getattr(er, "url", embedded) or embedded
+                        target = getattr(er, "url", embedded_target) or embedded_target
                         base_text_len = candidate_len
                 except Exception as exc:
                     print(f"[DEEP] embed ignorado {embedded}: {exc}")
