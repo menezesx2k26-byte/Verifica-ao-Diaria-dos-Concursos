@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 cloudflare/node_modules/
 cloudflare/.wrangler/
+cloudflare/wrangler.generated.jsonc
+cloudflare/.secrets.generated.json
