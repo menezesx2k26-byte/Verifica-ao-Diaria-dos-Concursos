@@ -2,6 +2,12 @@ name: Concursos Watch — GitHub
 
 on:
   workflow_dispatch:
+    inputs:
+      send_test_alert:
+        description: "Enviar alerta de teste por todos os canais configurados"
+        required: false
+        default: false
+        type: boolean
   push:
     branches: [main]
     paths:
@@ -50,6 +56,8 @@ jobs:
           CLOUDFLARE_HEARTBEAT_URL: ${{ secrets.CLOUDFLARE_HEARTBEAT_URL }}
           CLOUDFLARE_HEALTH_URL: ${{ secrets.CLOUDFLARE_HEALTH_URL }}
           WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
+          ALERT_GITHUB_ASSIGNEE: ${{ github.repository_owner }}
+          WATCH_TEST_ALERT: ${{ inputs.send_test_alert || 'false' }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python monitor.py
 
