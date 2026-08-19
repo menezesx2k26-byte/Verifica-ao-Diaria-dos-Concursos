@@ -71,6 +71,19 @@ jobs:
           assert search_probe.relevant_contexts(sections[0], probe)
           assert not search_probe.official_sections("Title: blog aleatório", probe["official_marker"])
 
+          assert deep_audit.audit_content_url(
+              "https://www.saovicente.sp.gov.br/x/ato.pdf/view?download=1"
+          ) == "https://www.saovicente.sp.gov.br/x/ato.pdf?download=1"
+          assert deep_audit.audit_content_url("https://example.org/view/123") == "https://example.org/view/123"
+          embeds = deep_audit.embedded_document_urls(
+              '<iframe src="/files/diario.pdf"></iframe><embed src="https://cdn.example/x.pdf">',
+              "https://gazeta.example/view/1",
+          )
+          assert embeds == [
+              "https://gazeta.example/files/diario.pdf",
+              "https://cdn.example/x.pdf",
+          ]
+
           semantic_source = {
               "document_require_groups": [
                   ["assistente tecnico de gestao", "02/2026"],
@@ -78,12 +91,13 @@ jobs:
               ]
           }
           facts = deep_audit.semantic_facts(
-              "CONCURSO PÚBLICO 02/2026 — ASSISTENTE TÉCNICO DE GESTÃO — HOMOLOGAÇÃO PARCIAL",
+              "CONCURSO PÚBLICO 02/2026 — ASSISTENTE TÉCNICO DE GESTÃO — HOMOLOGO A CLASSIFICAÇÃO FINAL",
               semantic_source,
           )
           assert facts["assistente_tecnico_gestao"] is True
           assert facts["concurso_02_2026"] is True
           assert facts["homologacao"] is True
+          assert facts["classificacao_final"] is True
           assert facts["source_match"] is True
           assert isinstance(facts["priority_match"], bool)
           assert set(facts).issuperset({
@@ -109,7 +123,7 @@ jobs:
               with open(path, encoding="utf-8") as f:
                   json.load(f)
               print("JSON OK:", path)
-          print("transport + state integrity + smtp + search probe + deep semantics OK")
+          print("transport + state integrity + smtp + search probe + deep content OK")
           PY
 
       - name: Validar bootstrap PowerShell
