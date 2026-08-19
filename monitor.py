@@ -21,6 +21,7 @@ from pypdf import PdfReader
 
 CONFIG = Path(os.getenv("WATCH_CONFIG", "config/sources.json"))
 STATE = Path(os.getenv("WATCH_STATE", "state/github.json"))
+RUNTIME_CONFIG = Path(os.getenv("WATCH_RUNTIME_CONFIG", "config/runtime.json"))
 TIMEOUT = 25
 CONTEXT_RADIUS = 500
 MAX_PDF_BYTES = 20_000_000
@@ -28,7 +29,7 @@ MAX_ALERTS = 12
 
 S = requests.Session()
 S.headers.update({
-    "User-Agent": "ConcursosWatch/2.0 (+personal public-notice monitor)",
+    "User-Agent": "ConcursosWatch/2.1 (+personal public-notice monitor)",
     "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.5",
     "Cache-Control": "no-cache",
 })
@@ -62,6 +63,12 @@ def save(path: Path, obj: Any) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
+
+
+def runtime_cloudflare_base() -> str | None:
+    data = load(RUNTIME_CONFIG, {})
+    value = str(data.get("cloudflare_url") or "").strip().rstrip("/")
+    return value or None
 
 
 def fetch(url: str, *, binary: bool = False) -> requests.Response:
@@ -198,9 +205,17 @@ def github_issue(subject: str, message: str) -> bool:
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    payload = {"title": subject[:250], "body": message + "\n\n_Gerado automaticamente pelo monitor do GitHub Actions._", "labels": ["watch-alert"]}
+    payload: dict[str, Any] = {
+        "title": subject[:250],
+        "body": message + "\n\n_Gerado automaticamente pelo monitor do GitHub Actions._",
+        "labels": ["watch-alert"],
+    }
+    assignee = (os.getenv("ALERT_GITHUB_ASSIGNEE") or "").strip()
+    if assignee:
+        payload["assignees"] = [assignee]
     r = requests.post(f"https://api.github.com/repos/{repo}/issues", json=payload, headers=headers, timeout=20)
     if r.status_code == 422:
+        # Label pode ainda não existir. Mantemos o assignee e repetimos sem label.
         payload.pop("labels", None)
         r = requests.post(f"https://api.github.com/repos/{repo}/issues", json=payload, headers=headers, timeout=20)
     r.raise_for_status()
@@ -209,6 +224,7 @@ def github_issue(subject: str, message: str) -> bool:
 
 def notify(subject: str, message: str, eid: str) -> None:
     failures = []
+    delivered = []
     for name, fn in (
         ("telegram", lambda: telegram(message)),
         ("ntfy", lambda: ntfy(message)),
@@ -216,15 +232,18 @@ def notify(subject: str, message: str, eid: str) -> None:
         ("github_issue", lambda: github_issue(subject, message)),
     ):
         try:
-            fn()
+            if fn():
+                delivered.append(name)
         except Exception as exc:
             failures.append(f"{name}: {exc}")
+    print("[NOTIFY] entregues=" + (",".join(delivered) if delivered else "nenhum canal externo configurado"))
     if failures:
         print("[WARN] canais com falha: " + " | ".join(failures), file=sys.stderr)
 
 
 def cloudflare_heartbeat() -> None:
-    url = os.getenv("CLOUDFLARE_HEARTBEAT_URL")
+    base = runtime_cloudflare_base()
+    url = os.getenv("CLOUDFLARE_HEARTBEAT_URL") or (f"{base}/heartbeat/github" if base else None)
     if not url:
         return
     headers = {"content-type": "application/json"}
@@ -235,7 +254,8 @@ def cloudflare_heartbeat() -> None:
 
 
 def check_cloudflare_health() -> str | None:
-    url = os.getenv("CLOUDFLARE_HEALTH_URL")
+    base = runtime_cloudflare_base()
+    url = os.getenv("CLOUDFLARE_HEALTH_URL") or (f"{base}/health" if base else None)
     if not url:
         return None
     r = requests.get(url, timeout=15)
@@ -335,6 +355,13 @@ def main() -> int:
             state["_cloudflare_watchdog_problem"] = False
     except Exception as exc:
         print(f"[WARN] health Cloudflare não pôde ser consultado: {exc}", file=sys.stderr)
+
+    test_alert = fold(os.getenv("WATCH_TEST_ALERT", "")) in {"1", "true", "yes", "sim"}
+    if test_alert:
+        events.append((
+            "TESTE OPERACIONAL",
+            "🧪 Teste manual do Concursos Watch. Se você recebeu esta mensagem por mais de um canal, a redundância de entrega está funcionando."
+        ))
 
     save(STATE, state)
 
