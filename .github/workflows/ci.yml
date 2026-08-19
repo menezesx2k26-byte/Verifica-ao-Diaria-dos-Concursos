@@ -39,9 +39,11 @@ jobs:
           python monitor.py --self-test
           python - <<'PY'
           import json
+          import deep_audit
           import monitor_runner as tr
           import smtp_alert
           import search_probe
+
           assert tr._allowed("https://www.ibamsp-concursos.org.br/informacoes/134/")
           assert not tr._allowed("https://example.com/")
           rendered = tr._markdown_as_html("[Edital](https://example.org/a.pdf)")
@@ -55,11 +57,26 @@ jobs:
           assert search_probe.relevant_contexts(sections[0], probe)
           assert not search_probe.official_sections("Title: blog aleatório", probe["official_marker"])
 
-          for path in ("config/sources.json",):
+          with open("config/deep_seeds.json", encoding="utf-8") as f:
+              deep_seeds = json.load(f)
+          seed_docs = deep_seeds["sources"]["sv_ibam_02_2026"]
+          assert len(seed_docs) >= 2
+          assert all(d["url"].startswith("https://anexos-r2.selecao.net.br/") for d in seed_docs)
+          selected = deep_audit.selected_documents(
+              {"id": "sv_ibam_02_2026", "deep_audit_count": 2},
+              {"sv_ibam_02_2026": {"document_urls": ["https://x/old.pdf", seed_docs[0]["url"]]}},
+              deep_seeds,
+          )
+          selected_urls = [d["url"] for d in selected]
+          assert seed_docs[0]["url"] in selected_urls
+          assert seed_docs[1]["url"] in selected_urls
+          assert selected_urls.count(seed_docs[0]["url"]) == 1
+
+          for path in ("config/sources.json", "config/deep_seeds.json"):
               with open(path, encoding="utf-8") as f:
                   json.load(f)
               print("JSON OK:", path)
-          print("transport + smtp + search probe OK")
+          print("transport + smtp + search probe + deep seeds OK")
           PY
 
       - uses: actions/setup-node@v4
