@@ -43,11 +43,20 @@
       "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/minuta-do-edital-de-resultado-dos-recursos-de-isencao-de-pagamento.pdf/view"
     ],
     "document_count": 20,
-    "parser_version": 4
+    "parser_version": 4,
+    "transport": "direct"
   },
   "sv_ibam_02_2026": {
-    "failures": 3,
-    "last_error": "falha ao buscar https://www.ibamsp-concursos.org.br/informacoes/134/: 403 Client Error: Forbidden for url: https://www.ibamsp-concursos.org.br/informacoes/134/"
+    "failures": 0,
+    "last_error": "falha ao buscar https://www.ibamsp-concursos.org.br/informacoes/134/: 403 Client Error: Forbidden for url: https://www.ibamsp-concursos.org.br/informacoes/134/",
+    "resolved_url": "https://www.ibamsp-concursos.org.br/informacoes/134/",
+    "last_status": 200,
+    "parser_version": 4,
+    "context_sigs": [],
+    "context_count": 0,
+    "document_urls": [],
+    "document_count": 0,
+    "transport": "reader-fallback"
   },
   "sv_convocacoes_2026": {
     "failures": 0,
@@ -57,7 +66,8 @@
     "context_count": 0,
     "document_urls": [],
     "document_count": 0,
-    "parser_version": 4
+    "parser_version": 4,
+    "transport": "direct"
   },
   "sv_bom": {
     "failures": 0,
@@ -86,7 +96,8 @@
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom667/view"
     ],
     "document_count": 20,
-    "parser_version": 4
+    "parser_version": 4,
+    "transport": "direct"
   },
   "pg_concursos_004_2024": {
     "failures": 0,
@@ -96,16 +107,29 @@
     "context_count": 0,
     "document_urls": [],
     "document_count": 0,
-    "parser_version": 4
+    "parser_version": 4,
+    "transport": "direct"
   },
   "pg_diario": {
     "failures": 0,
     "resolved_url": "https://plenussistemas.dioenet.com.br/list/praia-grande",
     "last_status": 200,
-    "document_urls": [],
-    "document_count": 0,
+    "document_urls": [
+      "https://plenussistemas.dioenet.com.br/uploads/view/36850?utm_edicao=434",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36859?utm_edicao=435_extra",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36866?utm_edicao=436",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36890?utm_edicao=437",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36908?utm_edicao=438",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36928?utm_edicao=439",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36951?utm_edicao=440",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36970?utm_edicao=441",
+      "https://plenussistemas.dioenet.com.br/uploads/view/36986?utm_edicao=442",
+      "https://plenussistemas.dioenet.com.br/uploads/view/37010?utm_edicao=443"
+    ],
+    "document_count": 10,
     "context_sigs": [],
     "context_count": 0,
-    "parser_version": 4
+    "parser_version": 4,
+    "transport": "direct"
   }
 }
