@@ -1,0 +1,53 @@
+name: Concursos Watch — CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - "monitor.py"
+      - "config/**"
+      - "requirements.txt"
+      - "cloudflare/**"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validar Python e JSON
+        run: |
+          python -m py_compile monitor.py
+          python - <<'PY'
+          import json
+          for path in ("config/sources.json",):
+              with open(path, encoding="utf-8") as f:
+                  json.load(f)
+              print("JSON OK:", path)
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validar Worker e Wrangler
+        working-directory: cloudflare
+        env:
+          WATCHDOG_TOKEN: ci-placeholder-not-a-real-secret
+        run: |
+          npm install --no-audit --no-fund
+          node --check src/index.js
+          node scripts/bootstrap.mjs --offline
+          node scripts/secrets.mjs
+          npx wrangler deploy --dry-run --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
+          rm -f wrangler.generated.jsonc .secrets.generated.json
