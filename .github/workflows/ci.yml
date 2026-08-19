@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - "monitor.py"
+      - "monitor_runner.py"
+      - "deep_audit.py"
       - "config/**"
       - "requirements.txt"
       - "cloudflare/**"
@@ -31,14 +33,20 @@ jobs:
 
       - name: Validar Python e JSON
         run: |
-          python -m py_compile monitor.py
+          python -m py_compile monitor.py monitor_runner.py deep_audit.py
           python monitor.py --self-test
           python - <<'PY'
           import json
+          import monitor_runner as tr
+          assert tr._allowed("https://www.ibamsp-concursos.org.br/informacoes/134/")
+          assert not tr._allowed("https://example.com/")
+          rendered = tr._markdown_as_html("[Edital](https://example.org/a.pdf)")
+          assert 'href="https://example.org/a.pdf"' in rendered
           for path in ("config/sources.json",):
               with open(path, encoding="utf-8") as f:
                   json.load(f)
               print("JSON OK:", path)
+          print("transport wrapper OK")
           PY
 
       - uses: actions/setup-node@v4
