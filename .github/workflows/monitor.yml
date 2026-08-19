@@ -12,6 +12,7 @@ on:
     branches: [main]
     paths:
       - "monitor.py"
+      - "monitor_runner.py"
       - "config/**"
       - "requirements.txt"
       - ".github/workflows/monitor.yml"
@@ -30,7 +31,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,8 +44,10 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Autoteste local do parser
-        run: python monitor.py --self-test
+      - name: Autoteste local do parser e transport wrapper
+        run: |
+          python monitor.py --self-test
+          python -m py_compile monitor_runner.py
 
       - name: Verificar fontes oficiais e watchdog Cloudflare
         env:
@@ -63,7 +66,7 @@ jobs:
           ALERT_GITHUB_ASSIGNEE: ${{ github.repository_owner }}
           WATCH_TEST_ALERT: ${{ inputs.send_test_alert || 'false' }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: python monitor.py
+        run: python monitor_runner.py
 
       - name: Persistir estado apenas quando mudou
         shell: bash
