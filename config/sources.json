@@ -1,29 +1,117 @@
 {
   "failure_threshold": 3,
+  "cloudflare_stale_minutes": 40,
+  "daily_health": {
+    "enabled": true,
+    "timezone": "America/Sao_Paulo",
+    "hour": 9
+  },
   "sources": [
     {
       "id": "sv_pref_02_2026",
       "city": "São Vicente",
       "label": "PMSV — Concurso 02/2026",
       "url": "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026",
-      "mode": "page_context",
-      "keywords": ["assistente-técnico de gestão", "assistente tecnico de gestao", "classificação", "classificacao", "resultado", "homolog", "convoca", "nomea", "posse", "reclassifica"]
+      "mode": "hybrid",
+      "context_radius": 900,
+      "trigger_terms": [
+        "classificação",
+        "classificacao",
+        "resultado",
+        "homolog",
+        "convoca",
+        "nomea",
+        "posse",
+        "reclassifica",
+        "assistente-técnico de gestão",
+        "assistente tecnico de gestao"
+      ],
+      "document_require_groups": [
+        [
+          "assistente-técnico de gestão",
+          "assistente tecnico de gestao",
+          "02/2026",
+          "concurso 02/2026"
+        ],
+        [
+          "classifica",
+          "resultado",
+          "homolog",
+          "convoca",
+          "nomea",
+          "posse",
+          "reclassifica"
+        ]
+      ]
     },
     {
       "id": "sv_ibam_02_2026",
       "city": "São Vicente",
       "label": "IBAM — São Vicente 02/2026",
       "url": "https://www.ibamsp-concursos.org.br/informacoes/134/",
-      "mode": "page_context",
-      "keywords": ["assistente-técnico de gestão", "assistente tecnico de gestao", "classificação", "classificacao", "resultado", "homolog", "convoca", "nomea"]
+      "mode": "hybrid",
+      "context_radius": 900,
+      "trigger_terms": [
+        "classificação",
+        "classificacao",
+        "resultado",
+        "homolog",
+        "convoca",
+        "nomea",
+        "assistente-técnico de gestão",
+        "assistente tecnico de gestao"
+      ],
+      "document_require_groups": [
+        [
+          "assistente-técnico de gestão",
+          "assistente tecnico de gestao",
+          "02/2026",
+          "concurso 02/2026"
+        ],
+        [
+          "classifica",
+          "resultado",
+          "homolog",
+          "convoca",
+          "nomea"
+        ]
+      ]
     },
     {
       "id": "sv_convocacoes_2026",
       "city": "São Vicente",
       "label": "PMSV — Convocações 2026",
       "url": "https://www.saovicente.sp.gov.br/institucional/concursos/convocacoes/convocacao-concursos-de-2026",
-      "mode": "page_context",
-      "keywords": ["assistente-técnico de gestão", "assistente tecnico de gestao", "02/2026", "convoca", "nomea", "posse"]
+      "mode": "hybrid",
+      "context_radius": 1200,
+      "trigger_terms": [
+        "convoca",
+        "nomea",
+        "posse",
+        "reclassifica"
+      ],
+      "require_groups": [
+        [
+          "assistente-técnico de gestão",
+          "assistente tecnico de gestao",
+          "02/2026",
+          "concurso 02/2026"
+        ]
+      ],
+      "document_require_groups": [
+        [
+          "assistente-técnico de gestão",
+          "assistente tecnico de gestao",
+          "02/2026",
+          "concurso 02/2026"
+        ],
+        [
+          "convoca",
+          "nomea",
+          "posse",
+          "reclassifica"
+        ]
+      ]
     },
     {
       "id": "sv_bom",
@@ -31,23 +119,158 @@
       "label": "PMSV — Boletim Oficial",
       "url": "https://www.saovicente.sp.gov.br/transparencia/bom?limite=30",
       "mode": "documents",
-      "keywords": ["assistente-técnico de gestão", "assistente tecnico de gestao", "02/2026", "concurso 02/2026", "convoca", "nomea", "homolog", "posse"]
+      "trigger_terms": [
+        "assistente-técnico de gestão",
+        "assistente tecnico de gestao",
+        "02/2026",
+        "concurso 02/2026",
+        "convoca",
+        "nomea",
+        "homolog",
+        "posse",
+        "classifica"
+      ],
+      "document_require_groups": [
+        [
+          "assistente-técnico de gestão",
+          "assistente tecnico de gestao",
+          "02/2026",
+          "concurso 02/2026"
+        ],
+        [
+          "convoca",
+          "nomea",
+          "homolog",
+          "posse",
+          "classifica",
+          "resultado",
+          "reclassifica"
+        ]
+      ],
+      "document_link_require_groups": [
+        [
+          "02/2026",
+          "assistente-técnico de gestão",
+          "assistente tecnico de gestao"
+        ]
+      ]
     },
     {
       "id": "pg_concursos_004_2024",
       "city": "Praia Grande",
       "label": "PG — Concursos 004/2024 ACS",
       "url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187",
-      "mode": "page_context",
-      "keywords": ["004/2024", "agente comunitário de saúde", "agente comunitario de saude", "convoca", "nomea", "posse", "tornando sem efeito", "reclassifica", "homolog"]
+      "mode": "hybrid",
+      "context_radius": 1600,
+      "trigger_terms": [
+        "convoca",
+        "nomea",
+        "posse",
+        "tornando sem efeito",
+        "reclassifica",
+        "homolog",
+        "classificação",
+        "classificacao"
+      ],
+      "require_groups": [
+        [
+          "004/2024",
+          "004-2024",
+          "004 2024"
+        ],
+        [
+          "agente comunitário de saúde",
+          "agente comunitario de saude",
+          "ACS"
+        ]
+      ],
+      "document_require_groups": [
+        [
+          "004/2024",
+          "004-2024",
+          "004 2024",
+          "agente comunitário de saúde",
+          "agente comunitario de saude"
+        ],
+        [
+          "convoca",
+          "nomea",
+          "posse",
+          "tornando sem efeito",
+          "reclassifica",
+          "homolog",
+          "classifica"
+        ]
+      ],
+      "document_link_require_groups": [
+        [
+          "004/2024",
+          "004-2024",
+          "004 2024"
+        ]
+      ]
     },
     {
       "id": "pg_diario",
       "city": "Praia Grande",
       "label": "PG — Diário Oficial Eletrônico",
       "url": "https://plenussistemas.dioenet.com.br/list/praia-grande",
-      "mode": "documents",
-      "keywords": ["004/2024", "agente comunitário de saúde", "agente comunitario de saude", "convoca", "nomea", "posse", "portaria", "tornando sem efeito"]
+      "mode": "hybrid",
+      "context_radius": 1500,
+      "trigger_terms": [
+        "004/2024",
+        "agente comunitário de saúde",
+        "agente comunitario de saude",
+        "convoca",
+        "nomea",
+        "posse",
+        "portaria",
+        "tornando sem efeito",
+        "reclassifica"
+      ],
+      "require_groups": [
+        [
+          "004/2024",
+          "004-2024",
+          "004 2024",
+          "agente comunitário de saúde",
+          "agente comunitario de saude"
+        ],
+        [
+          "convoca",
+          "nomea",
+          "posse",
+          "portaria",
+          "tornando sem efeito",
+          "reclassifica"
+        ]
+      ],
+      "document_require_groups": [
+        [
+          "004/2024",
+          "004-2024",
+          "004 2024",
+          "agente comunitário de saúde",
+          "agente comunitario de saude"
+        ],
+        [
+          "convoca",
+          "nomea",
+          "posse",
+          "portaria",
+          "tornando sem efeito",
+          "reclassifica"
+        ]
+      ],
+      "document_link_require_groups": [
+        [
+          "004/2024",
+          "004-2024",
+          "004 2024",
+          "agente comunitário de saúde",
+          "agente comunitario de saude"
+        ]
+      ]
     }
   ]
 }

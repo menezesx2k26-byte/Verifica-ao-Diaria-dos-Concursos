@@ -43,6 +43,9 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Autoteste local do parser
+        run: python monitor.py --self-test
+
       - name: Verificar fontes oficiais e watchdog Cloudflare
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -56,13 +59,16 @@ jobs:
           CLOUDFLARE_HEARTBEAT_URL: ${{ secrets.CLOUDFLARE_HEARTBEAT_URL }}
           CLOUDFLARE_HEALTH_URL: ${{ secrets.CLOUDFLARE_HEALTH_URL }}
           WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
+          WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
           ALERT_GITHUB_ASSIGNEE: ${{ github.repository_owner }}
           WATCH_TEST_ALERT: ${{ inputs.send_test_alert || 'false' }}
           GITHUB_TOKEN: ${{ github.token }}
         run: python monitor.py
 
       - name: Persistir estado apenas quando mudou
+        shell: bash
         run: |
+          set -euo pipefail
           if git diff --quiet -- state/github.json; then
             exit 0
           fi
@@ -70,11 +76,13 @@ jobs:
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
           git add state/github.json
           git commit -m "chore(watch): update monitor state"
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main
 
       - name: Keepalive quinzenal do repositório público
         shell: bash
         run: |
+          set -euo pipefail
           DAY="$(date -u +%d)"
           if [[ "$DAY" != "01" && "$DAY" != "15" ]]; then
             exit 0
@@ -84,4 +92,5 @@ jobs:
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
           git add .watch-keepalive
           git commit -m "chore: scheduled watch keepalive" || exit 0
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main
