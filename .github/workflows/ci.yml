@@ -13,6 +13,7 @@ on:
       - "config/**"
       - "requirements.txt"
       - "cloudflare/**"
+      - "scripts/**"
       - ".github/workflows/**"
 
 permissions:
@@ -91,6 +92,22 @@ jobs:
               print("JSON OK:", path)
           print("transport + state integrity + smtp + search probe + deep seeds OK")
           PY
+
+      - name: Validar bootstrap PowerShell
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "scripts/bootstrap-windows.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Write-Host "bootstrap-windows.ps1 syntax OK"
 
       - uses: actions/setup-node@v4
         with:
