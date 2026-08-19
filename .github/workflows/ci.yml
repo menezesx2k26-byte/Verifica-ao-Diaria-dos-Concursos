@@ -54,8 +54,6 @@ jobs:
           assert 'href="https://example.org/a.pdf"' in rendered
           assert smtp_alert.send_gmail("teste", "teste") is False
 
-          # A falha atual precisa invalidar status HTTP herdado de uma tentativa
-          # antiga; caso contrário o JSON pode parecer simultaneamente 200 e down.
           temp_state = Path(tempfile.mkdtemp()) / "state.json"
           tr.monitor.STATE = temp_state
           fake_state = {"ibam": {"failures": 3, "last_status": 200}}
@@ -75,6 +73,16 @@ jobs:
               "https://www.saovicente.sp.gov.br/x/ato.pdf/view?download=1"
           ) == "https://www.saovicente.sp.gov.br/x/ato.pdf?download=1"
           assert deep_audit.audit_content_url("https://example.org/view/123") == "https://example.org/view/123"
+          dioenet_viewer = (
+              "https://plenussistemas.dioenet.com.br/public/viewer/web/viewer.php?"
+              "c=abc&file=https%3A%2F%2Fplenussistemas.dioenet.com.br%2Fpublic%2Fuploads%2Fdiarios%2F2026%2F08%2Fato.pdf"
+          )
+          assert deep_audit.audit_content_url(dioenet_viewer) == (
+              "https://plenussistemas.dioenet.com.br/public/uploads/diarios/2026/08/ato.pdf"
+          )
+          unsafe_viewer = "https://example.org/viewer.php?file=file:///etc/passwd"
+          assert deep_audit.audit_content_url(unsafe_viewer) == unsafe_viewer
+
           embeds = deep_audit.embedded_document_urls(
               '<iframe src="/files/diario.pdf"></iframe><embed src="https://cdn.example/x.pdf">',
               "https://gazeta.example/view/1",
@@ -123,7 +131,7 @@ jobs:
               with open(path, encoding="utf-8") as f:
                   json.load(f)
               print("JSON OK:", path)
-          print("transport + state integrity + smtp + search probe + deep content OK")
+          print("transport + state integrity + smtp + search probe + DIOENET PDF unwrap OK")
           PY
 
       - name: Validar bootstrap PowerShell
