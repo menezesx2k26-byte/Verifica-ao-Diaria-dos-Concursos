@@ -10,6 +10,7 @@ for (const key of required) {
 
 const names = [
   "WATCHDOG_TOKEN",
+  "WATCH_PRIORITY_TERMS",
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_CHAT_ID",
   "NTFY_TOPIC",
