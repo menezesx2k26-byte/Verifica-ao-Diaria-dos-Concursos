@@ -8,6 +8,7 @@ on:
       - "deep_audit.py"
       - "monitor.py"
       - "monitor_runner.py"
+      - "smtp_alert.py"
       - "config/sources.json"
       - ".github/workflows/deep-audit.yml"
   schedule:
@@ -40,7 +41,7 @@ jobs:
 
       - name: Validar scripts
         run: |
-          python -m py_compile monitor.py monitor_runner.py deep_audit.py
+          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py
           python monitor.py --self-test
 
       - name: Auditar documentos conhecidos por conteúdo
@@ -53,6 +54,10 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
           ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+          GMAIL_SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
+          GMAIL_SMTP_APP_PASSWORD: ${{ secrets.GMAIL_SMTP_APP_PASSWORD }}
+          GMAIL_ALERT_TO: ${{ secrets.GMAIL_ALERT_TO }}
+          GMAIL_SMTP_FROM: ${{ secrets.GMAIL_SMTP_FROM }}
           WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
           ALERT_GITHUB_ASSIGNEE: ${{ github.repository_owner }}
           GITHUB_TOKEN: ${{ github.token }}
