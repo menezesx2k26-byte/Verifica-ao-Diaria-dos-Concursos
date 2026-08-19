@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Daily deep audit for documents that may be silently replaced at the same URL.
+"""Recurring deep audit for documents that may be silently replaced at the same URL.
 
 The frequent monitor is optimized for new links and relevant page contexts. This
 second pass deliberately downloads only a small tail of already-known documents
-once per day and fingerprints their normalized textual content. It catches the
-important edge case where a municipality/bank edits or replaces a PDF without
-changing its URL.
+plus a tiny set of critical seeded documents and fingerprints their normalized
+textual content. It catches the important edge case where a municipality/bank
+edits or replaces a PDF without changing its URL.
 """
 from __future__ import annotations
 
@@ -20,9 +20,10 @@ import monitor_runner as transports
 import monitor
 
 DEEP_STATE = Path(os.getenv("WATCH_DEEP_STATE", "state/deep.json"))
+SEEDS_CONFIG = Path(os.getenv("WATCH_DEEP_SEEDS", "config/deep_seeds.json"))
 DEFAULT_PER_SOURCE = 6
 MAX_EVENTS = 10
-AUDIT_VERSION = 2
+AUDIT_VERSION = 3
 
 
 def now_iso() -> str:
@@ -64,27 +65,58 @@ def save(path: Path, obj: Any) -> None:
     tmp.replace(path)
 
 
+def selected_documents(
+    source: dict[str, Any],
+    live: dict[str, Any],
+    seeds: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Return a bounded live tail plus all explicit critical seeds, deduplicated by URL."""
+    sid = source["id"]
+    count = int(source.get("deep_audit_count", DEFAULT_PER_SOURCE))
+    live_urls = list((live.get(sid) or {}).get("document_urls") or [])[-max(1, count):]
+
+    docs: dict[str, dict[str, Any]] = {
+        url: {"url": url, "label": "documento conhecido", "seeded": False}
+        for url in live_urls
+    }
+    for item in ((seeds.get("sources") or {}).get(sid) or []):
+        url = str(item.get("url") or "").strip()
+        if not url:
+            continue
+        docs[url] = {
+            "url": url,
+            "label": str(item.get("label") or "documento crítico").strip(),
+            "stage": str(item.get("stage") or "").strip() or None,
+            "seeded": True,
+        }
+    return list(docs.values())
+
+
 def main() -> int:
     cfg = load(monitor.CONFIG, {})
     live = load(monitor.STATE, {})
+    seeds = load(SEEDS_CONFIG, {})
     deep = load(DEEP_STATE, {})
     events: list[tuple[str, str]] = []
     failures = 0
+    seeded_count = 0
 
     for source in cfg.get("sources", []):
         sid = source["id"]
-        urls = list((live.get(sid) or {}).get("document_urls") or [])
-        if not urls:
+        selected = selected_documents(source, live, seeds)
+        if not selected:
             continue
-        count = int(source.get("deep_audit_count", DEFAULT_PER_SOURCE))
-        selected = urls[-max(1, count):]
+
         old_source = deep.get(sid) or {}
         old_docs = old_source.get("documents") or {}
         new_docs: dict[str, Any] = {}
 
         print(f"[DEEP] {source['label']} — {len(selected)} documento(s)")
-        for url in selected:
+        for doc in selected:
+            url = doc["url"]
             old = old_docs.get(url) or {}
+            if doc.get("seeded"):
+                seeded_count += 1
             try:
                 text = extract_document_text(url)
                 normalized = monitor.fold(text)
@@ -94,6 +126,9 @@ def main() -> int:
                     "checked_at": now_iso(),
                     "chars": len(normalized),
                     "failures": 0,
+                    "label": doc.get("label"),
+                    "stage": doc.get("stage"),
+                    "seeded": bool(doc.get("seeded")),
                 }
 
                 previous = old.get("signature")
@@ -104,7 +139,9 @@ def main() -> int:
                         events.append((
                             f"{prefix} — {source['label']}",
                             "🔁 Um documento já conhecido mudou de conteúdo sem mudar de URL.\n\n"
-                            f"{snippet[:1700]}\n\nDocumento: {url}\nFonte índice: {source['url']}",
+                            f"Documento: {doc.get('label') or '(sem rótulo)'}\n"
+                            f"Estágio: {doc.get('stage') or 'não informado'}\n\n"
+                            f"{snippet[:1700]}\n\nURL: {url}\nFonte índice: {source['url']}",
                         ))
                     else:
                         print(f"[DEEP] fingerprint mudou, mas sem correspondência atual: {url}")
@@ -116,11 +153,16 @@ def main() -> int:
                     "checked_at": now_iso(),
                     "failures": n,
                     "last_error": str(exc)[:700],
+                    "label": doc.get("label"),
+                    "stage": doc.get("stage"),
+                    "seeded": bool(doc.get("seeded")),
                 }
                 if n == 3 and int(old.get("failures", 0)) < 3:
                     events.append((
                         f"DEEP AUDIT INDISPONÍVEL — {source['label']}",
-                        f"⚠️ O mesmo documento falhou em 3 auditorias profundas.\nDocumento: {url}\nErro: {exc}",
+                        "⚠️ O mesmo documento falhou em 3 auditorias profundas.\n"
+                        f"Documento: {doc.get('label') or '(sem rótulo)'}\n"
+                        f"URL: {url}\nErro: {exc}",
                     ))
 
         deep[sid] = {
@@ -133,6 +175,7 @@ def main() -> int:
         "audit_version": AUDIT_VERSION,
         "checked_at": now_iso(),
         "sources": len([k for k in deep if not k.startswith("_")]),
+        "seeded_documents_checked": seeded_count,
         "failures": failures,
     }
     save(DEEP_STATE, deep)
@@ -141,7 +184,10 @@ def main() -> int:
         eid = monitor.event_id(subject, body)
         monitor.notify(f"[CONCURSOS][DEEP-{eid}] {subject}", body, f"deep-{eid}")
 
-    print(f"[DEEP] concluído: eventos={len(events)} falhas={failures}")
+    print(
+        f"[DEEP] concluído: eventos={len(events)} falhas={failures} "
+        f"seeds={seeded_count}"
+    )
     return 0
 
 
