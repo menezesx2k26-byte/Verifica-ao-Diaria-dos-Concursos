@@ -1,0 +1,72 @@
+name: Concursos Watch — GitHub
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Fora do minuto 0 para reduzir risco de atraso sob carga.
+    - cron: "7,22,37,52 * * * *"
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: concursos-watch-github
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Verificar fontes oficiais e watchdog Cloudflare
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+          CLOUDFLARE_HEARTBEAT_URL: ${{ secrets.CLOUDFLARE_HEARTBEAT_URL }}
+          CLOUDFLARE_HEALTH_URL: ${{ secrets.CLOUDFLARE_HEALTH_URL }}
+          WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python monitor.py
+
+      - name: Persistir estado apenas quando mudou
+        run: |
+          if git diff --quiet -- state/github.json; then
+            exit 0
+          fi
+          git config user.name "concursos-watch[bot]"
+          git config user.email "concursos-watch[bot]@users.noreply.github.com"
+          git add state/github.json
+          git commit -m "chore(watch): update monitor state"
+          git push
+
+      - name: Keepalive quinzenal do repositório público
+        shell: bash
+        run: |
+          DAY="$(date -u +%d)"
+          if [[ "$DAY" != "01" && "$DAY" != "15" ]]; then
+            exit 0
+          fi
+          date -u +%FT%TZ > .watch-keepalive
+          git config user.name "concursos-watch[bot]"
+          git config user.email "concursos-watch[bot]@users.noreply.github.com"
+          git add .watch-keepalive
+          git commit -m "chore: scheduled watch keepalive" || exit 0
+          git push
