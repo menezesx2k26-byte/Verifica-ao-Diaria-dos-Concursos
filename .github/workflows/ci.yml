@@ -39,6 +39,9 @@ jobs:
           python monitor.py --self-test
           python - <<'PY'
           import json
+          import tempfile
+          from pathlib import Path
+
           import deep_audit
           import monitor_runner as tr
           import smtp_alert
@@ -49,6 +52,16 @@ jobs:
           rendered = tr._markdown_as_html("[Edital](https://example.org/a.pdf)")
           assert 'href="https://example.org/a.pdf"' in rendered
           assert smtp_alert.send_gmail("teste", "teste") is False
+
+          # A falha atual precisa invalidar status HTTP herdado de uma tentativa
+          # antiga; caso contrário o JSON pode parecer simultaneamente 200 e down.
+          temp_state = Path(tempfile.mkdtemp()) / "state.json"
+          tr.monitor.STATE = temp_state
+          fake_state = {"ibam": {"failures": 3, "last_status": 200}}
+          tr.save_with_state_integrity(temp_state, fake_state)
+          assert fake_state["ibam"]["last_attempt_ok"] is False
+          assert fake_state["ibam"]["last_status"] is None
+          assert fake_state["ibam"]["last_failure"]
 
           fake_search = '''Title: IBAM São Vicente\nURL Source: https://www.ibamsp-concursos.org.br/informacoes/134/\nSÃO VICENTE - CONCURSO PÚBLICO - 02/2026\n24- Despacho de Homologação Parcial'''
           sections = search_probe.official_sections(fake_search, "ibamsp-concursos.org.br/informacoes/134")
@@ -76,7 +89,7 @@ jobs:
               with open(path, encoding="utf-8") as f:
                   json.load(f)
               print("JSON OK:", path)
-          print("transport + smtp + search probe + deep seeds OK")
+          print("transport + state integrity + smtp + search probe + deep seeds OK")
           PY
 
       - uses: actions/setup-node@v4
