@@ -8,17 +8,16 @@ on:
       - "deep_audit.py"
       - "monitor.py"
       - "monitor_runner.py"
-      - "smtp_alert.py"
       - "config/sources.json"
       - "config/deep_seeds.json"
       - ".github/workflows/deep-audit.yml"
   schedule:
-    # Auditoria pesada intercalada: 8 execuções/dia, no minuto 13 UTC.
     - cron: "13 */3 * * *"
 
+# Deep Audit é telemetria/fingerprint. Ele não fala diretamente com o usuário:
+# qualquer confirmação acionável deve passar pelo monitor principal.
 permissions:
   contents: write
-  issues: write
 
 concurrency:
   group: concursos-watch-deep-audit
@@ -57,22 +56,8 @@ jobs:
           PY
 
       - name: Auditar documentos conhecidos por conteúdo
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
-          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
-          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
-          GMAIL_SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
-          GMAIL_SMTP_APP_PASSWORD: ${{ secrets.GMAIL_SMTP_APP_PASSWORD }}
-          GMAIL_ALERT_TO: ${{ secrets.GMAIL_ALERT_TO }}
-          GMAIL_SMTP_FROM: ${{ secrets.GMAIL_SMTP_FROM }}
-          WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
-          ALERT_GITHUB_ASSIGNEE: ${{ github.repository_owner }}
-          GITHUB_TOKEN: ${{ github.token }}
+        # Sem tokens/canais de alerta por design. O Deep Audit só persiste fatos,
+        # fingerprints e falhas para correlação posterior.
         run: python deep_audit.py
 
       - name: Persistir fingerprints
@@ -83,8 +68,6 @@ jobs:
             echo "deep_audit.py não gerou state/deep.json"
             exit 1
           fi
-          # `git diff` ignora arquivo novo/untracked. `git status --porcelain`
-          # detecta tanto o primeiro baseline quanto alterações posteriores.
           if [[ -z "$(git status --porcelain -- state/deep.json)" ]]; then
             echo "Sem mudança no estado profundo."
             exit 0
