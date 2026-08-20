@@ -3,12 +3,12 @@ name: Concursos Watch — Search Probe
 on:
   workflow_dispatch:
   schedule:
-    # Sensor auxiliar, intercalado com o monitor principal.
     - cron: "11,41 * * * *"
 
+# Search Probe é radar de descoberta, não confirmação oficial e não deve notificar
+# diretamente o usuário nem criar Issues.
 permissions:
   contents: write
-  issues: write
 
 concurrency:
   group: concursos-watch-search-probe
@@ -36,21 +36,6 @@ jobs:
       - name: Consultar índice web auxiliar
         env:
           JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
-          WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
-          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
-          ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
-          GMAIL_SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
-          GMAIL_SMTP_APP_PASSWORD: ${{ secrets.GMAIL_SMTP_APP_PASSWORD }}
-          GMAIL_ALERT_TO: ${{ secrets.GMAIL_ALERT_TO }}
-          GMAIL_SMTP_FROM: ${{ secrets.GMAIL_SMTP_FROM }}
-          ALERT_GITHUB_ASSIGNEE: ${{ github.repository_owner }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: python search_probe.py
 
       - name: Persistir estado do sensor

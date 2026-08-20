@@ -13,55 +13,18 @@
       "label": "PMSV — Concurso 02/2026",
       "url": "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026",
       "mode": "hybrid",
-      "context_radius": 900,
-      "trigger_terms": [
-        "classificação",
-        "classificacao",
-        "resultado",
-        "homolog",
-        "convoca",
-        "nomea",
-        "posse",
-        "reclassifica",
-        "assistente-técnico de gestão",
-        "assistente tecnico de gestao"
+      "context_radius": 1100,
+      "trigger_terms": ["classifica", "resultado", "homolog", "convoca", "nomea", "posse", "reclassifica"],
+      "bootstrap_critical_terms": ["classificação final", "classificacao final", "homologação", "homologacao", "nomeação", "nomeacao", "convocação para posse", "convocacao para posse", "exames admissionais", "entrega de documentos"],
+      "require_groups": [
+        ["02/2026", "02-2026", "concurso 02/2026", "concurso público 02/2026", "concurso publico 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"]
       ],
-      "bootstrap_critical_terms": [
-        "classificação final",
-        "classificacao final",
-        "homologação",
-        "homologacao",
-        "nomeação",
-        "nomeacao",
-        "convocação para posse",
-        "convocacao para posse",
-        "exames admissionais",
-        "entrega de documentos"
-      ],
-      "document_discovery_groups": [
-        [
-          "concurso-no-02-2026",
-          "cp-02-2026",
-          "cp-02-26",
-          "02/2026"
-        ]
-      ],
+      "document_discovery_groups": [["concurso-no-02-2026", "cp-02-2026", "cp-02-26", "02/2026"]],
       "document_require_groups": [
-        [
-          "assistente-técnico de gestão",
-          "assistente tecnico de gestao",
-          "02/2026",
-          "concurso 02/2026"
-        ],
-        [
-          "classifica",
-          "resultado",
-          "homolog",
-          "convoca",
-          "nomea",
-          "posse",
-          "reclassifica"
-        ]
+        ["02/2026", "02-2026", "concurso 02/2026", "concurso público 02/2026", "concurso publico 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"],
+        ["classifica", "resultado", "homolog", "convoca", "nomea", "posse", "reclassifica"]
       ]
     },
     {
@@ -70,52 +33,18 @@
       "label": "IBAM — São Vicente 02/2026",
       "url": "https://www.ibamsp-concursos.org.br/informacoes/134/",
       "mode": "hybrid",
-      "context_radius": 900,
-      "trigger_terms": [
-        "classificação",
-        "classificacao",
-        "resultado",
-        "homolog",
-        "convoca",
-        "nomea",
-        "assistente-técnico de gestão",
-        "assistente tecnico de gestao"
+      "context_radius": 1100,
+      "trigger_terms": ["classifica", "resultado", "homolog", "convoca", "nomea", "posse", "reclassifica"],
+      "bootstrap_critical_terms": ["classificação final", "classificacao final", "homologação", "homologacao", "nomeação", "nomeacao", "convocação para posse", "convocacao para posse"],
+      "require_groups": [
+        ["02/2026", "02-2026", "concurso 02/2026", "concurso público 02/2026", "concurso publico 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"]
       ],
-      "bootstrap_critical_terms": [
-        "classificação final",
-        "classificacao final",
-        "homologação",
-        "homologacao",
-        "nomeação",
-        "nomeacao",
-        "convocação para posse",
-        "convocacao para posse"
-      ],
-      "document_discovery_any": [
-        "edital",
-        "resultado",
-        "classificação",
-        "classificacao",
-        "retificação",
-        "retificacao",
-        "convocação",
-        "convocacao",
-        "homolog"
-      ],
+      "document_discovery_any": ["edital", "resultado", "classificação", "classificacao", "retificação", "retificacao", "convocação", "convocacao", "homolog"],
       "document_require_groups": [
-        [
-          "assistente-técnico de gestão",
-          "assistente tecnico de gestao",
-          "02/2026",
-          "concurso 02/2026"
-        ],
-        [
-          "classifica",
-          "resultado",
-          "homolog",
-          "convoca",
-          "nomea"
-        ]
+        ["02/2026", "02-2026", "concurso 02/2026", "concurso público 02/2026", "concurso publico 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"],
+        ["classifica", "resultado", "homolog", "convoca", "nomea", "posse", "reclassifica"]
       ]
     },
     {
@@ -124,47 +53,18 @@
       "label": "PMSV — Convocações 2026",
       "url": "https://www.saovicente.sp.gov.br/institucional/concursos/convocacoes/convocacao-concursos-de-2026",
       "mode": "hybrid",
-      "context_radius": 1200,
-      "trigger_terms": [
-        "convoca",
-        "nomea",
-        "posse",
-        "reclassifica"
-      ],
-      "bootstrap_critical_terms": [
-        "assistente-técnico de gestão",
-        "assistente tecnico de gestao",
-        "02/2026"
-      ],
+      "context_radius": 1400,
+      "trigger_terms": ["convoca", "nomea", "posse", "reclassifica"],
+      "bootstrap_critical_terms": ["assistente-técnico de gestão", "assistente tecnico de gestao", "02/2026"],
       "require_groups": [
-        [
-          "assistente-técnico de gestão",
-          "assistente tecnico de gestao",
-          "02/2026",
-          "concurso 02/2026"
-        ]
+        ["02/2026", "02-2026", "concurso 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"]
       ],
-      "document_discovery_groups": [
-        [
-          "assistente-técnico de gestão",
-          "assistente tecnico de gestao",
-          "02/2026",
-          "concurso 02/2026"
-        ]
-      ],
+      "document_discovery_groups": [["02/2026", "02-2026", "concurso 02/2026"]],
       "document_require_groups": [
-        [
-          "assistente-técnico de gestão",
-          "assistente tecnico de gestao",
-          "02/2026",
-          "concurso 02/2026"
-        ],
-        [
-          "convoca",
-          "nomea",
-          "posse",
-          "reclassifica"
-        ]
+        ["02/2026", "02-2026", "concurso 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"],
+        ["convoca", "nomea", "posse", "reclassifica"]
       ]
     },
     {
@@ -173,40 +73,15 @@
       "label": "PMSV — Boletim Oficial",
       "url": "https://www.saovicente.sp.gov.br/transparencia/bom?limite=30",
       "mode": "documents",
-      "trigger_terms": [
-        "assistente-técnico de gestão",
-        "assistente tecnico de gestao",
-        "02/2026",
-        "concurso 02/2026",
-        "convoca",
-        "nomea",
-        "homolog",
-        "posse",
-        "classifica"
-      ],
+      "trigger_terms": ["convoca", "nomea", "homolog", "posse", "classifica", "resultado", "reclassifica"],
       "document_require_groups": [
-        [
-          "assistente-técnico de gestão",
-          "assistente tecnico de gestao",
-          "02/2026",
-          "concurso 02/2026"
-        ],
-        [
-          "convoca",
-          "nomea",
-          "homolog",
-          "posse",
-          "classifica",
-          "resultado",
-          "reclassifica"
-        ]
+        ["02/2026", "02-2026", "concurso 02/2026", "concurso público 02/2026", "concurso publico 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"],
+        ["convoca", "nomea", "homolog", "posse", "classifica", "resultado", "reclassifica"]
       ],
       "document_link_require_groups": [
-        [
-          "02/2026",
-          "assistente-técnico de gestão",
-          "assistente tecnico de gestao"
-        ]
+        ["02/2026", "02-2026", "concurso 02/2026"],
+        ["assistente-técnico de gestão", "assistente tecnico de gestao"]
       ]
     },
     {
@@ -215,71 +90,22 @@
       "label": "PG — Concursos 004/2024 ACS",
       "url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187",
       "mode": "hybrid",
-      "context_radius": 1600,
-      "trigger_terms": [
-        "convoca",
-        "nomea",
-        "posse",
-        "tornando sem efeito",
-        "reclassifica",
-        "homolog",
-        "classificação",
-        "classificacao"
-      ],
-      "bootstrap_critical_terms": [
-        "convocação",
-        "convocacao",
-        "nomeação",
-        "nomeacao",
-        "posse",
-        "exame admissional",
-        "entrega de documentos"
-      ],
+      "context_radius": 1800,
+      "trigger_terms": ["convoca", "nomea", "posse", "tornando sem efeito", "reclassifica", "homolog", "classifica", "exame admissional", "entrega de documentos"],
+      "bootstrap_critical_terms": ["convocação", "convocacao", "nomeação", "nomeacao", "posse", "exame admissional", "entrega de documentos"],
       "require_groups": [
-        [
-          "004/2024",
-          "004-2024",
-          "004 2024"
-        ],
-        [
-          "agente comunitário de saúde",
-          "agente comunitario de saude",
-          "ACS"
-        ]
+        ["004/2024", "004-2024", "004 2024"],
+        ["agente comunitário de saúde", "agente comunitario de saude", "ACS"]
       ],
-      "document_discovery_groups": [
-        [
-          "004/2024",
-          "004-2024",
-          "004 2024",
-          "agente comunitário de saúde",
-          "agente comunitario de saude"
-        ]
-      ],
+      "document_discovery_groups": [["004/2024", "004-2024", "004 2024"]],
       "document_require_groups": [
-        [
-          "004/2024",
-          "004-2024",
-          "004 2024",
-          "agente comunitário de saúde",
-          "agente comunitario de saude"
-        ],
-        [
-          "convoca",
-          "nomea",
-          "posse",
-          "tornando sem efeito",
-          "reclassifica",
-          "homolog",
-          "classifica"
-        ]
+        ["004/2024", "004-2024", "004 2024"],
+        ["agente comunitário de saúde", "agente comunitario de saude", "ACS"],
+        ["convoca", "nomea", "posse", "tornando sem efeito", "reclassifica", "homolog", "classifica", "exame admissional", "entrega de documentos"]
       ],
       "document_link_require_groups": [
-        [
-          "004/2024",
-          "004-2024",
-          "004 2024"
-        ]
+        ["004/2024", "004-2024", "004 2024"],
+        ["agente comunitário de saúde", "agente comunitario de saude", "ACS"]
       ]
     },
     {
@@ -288,60 +114,21 @@
       "label": "PG — Diário Oficial Eletrônico",
       "url": "https://plenussistemas.dioenet.com.br/list/praia-grande",
       "mode": "hybrid",
-      "context_radius": 1500,
-      "trigger_terms": [
-        "004/2024",
-        "agente comunitário de saúde",
-        "agente comunitario de saude",
-        "convoca",
-        "nomea",
-        "posse",
-        "portaria",
-        "tornando sem efeito",
-        "reclassifica"
-      ],
+      "context_radius": 1800,
+      "trigger_terms": ["convoca", "nomea", "posse", "portaria", "tornando sem efeito", "reclassifica", "exame admissional", "entrega de documentos"],
       "require_groups": [
-        [
-          "004/2024",
-          "004-2024",
-          "004 2024",
-          "agente comunitário de saúde",
-          "agente comunitario de saude"
-        ],
-        [
-          "convoca",
-          "nomea",
-          "posse",
-          "portaria",
-          "tornando sem efeito",
-          "reclassifica"
-        ]
+        ["004/2024", "004-2024", "004 2024"],
+        ["agente comunitário de saúde", "agente comunitario de saude", "ACS"],
+        ["convoca", "nomea", "posse", "portaria", "tornando sem efeito", "reclassifica", "exame admissional", "entrega de documentos"]
       ],
       "document_require_groups": [
-        [
-          "004/2024",
-          "004-2024",
-          "004 2024",
-          "agente comunitário de saúde",
-          "agente comunitario de saude"
-        ],
-        [
-          "convoca",
-          "nomea",
-          "posse",
-          "portaria",
-          "tornando sem efeito",
-          "reclassifica"
-        ]
+        ["004/2024", "004-2024", "004 2024"],
+        ["agente comunitário de saúde", "agente comunitario de saude", "ACS"],
+        ["convoca", "nomea", "posse", "portaria", "tornando sem efeito", "reclassifica", "exame admissional", "entrega de documentos"]
       ],
       "document_link_require_groups": [
-        [
-          "004/2024",
-          "004-2024",
-          "004 2024",
-          "agente comunitário de saúde",
-          "agente comunitario de saude"
-        ]
+        ["004/2024", "004-2024", "004 2024"],
+        ["agente comunitário de saúde", "agente comunitario de saude", "ACS"]
       ]
     }
   ]

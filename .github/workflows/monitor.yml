@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       send_test_alert:
-        description: "Enviar alerta de teste por todos os canais configurados"
+        description: "Enviar alerta de teste por todos os canais externos configurados"
         required: false
         default: false
         type: boolean
@@ -18,12 +18,12 @@ on:
       - "requirements.txt"
       - ".github/workflows/monitor.yml"
   schedule:
-    # Fora do minuto 0 para reduzir risco de atraso sob carga.
     - cron: "7,22,37,52 * * * *"
 
+# GitHub é infraestrutura, não canal de alerta. O monitor grava estado, mas não
+# abre/atribui Issues automáticas a cada detecção.
 permissions:
   contents: write
-  issues: write
 
 concurrency:
   group: concursos-watch-github
@@ -68,9 +68,7 @@ jobs:
           CLOUDFLARE_HEALTH_URL: ${{ secrets.CLOUDFLARE_HEALTH_URL }}
           WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
           WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
-          ALERT_GITHUB_ASSIGNEE: ${{ github.repository_owner }}
           WATCH_TEST_ALERT: ${{ inputs.send_test_alert || 'false' }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: python monitor_runner.py
 
       - name: Persistir estado apenas quando mudou
