@@ -65,7 +65,6 @@
     "resolved_url": "https://www.saovicente.sp.gov.br/transparencia/bom?limite=30",
     "last_status": 200,
     "document_urls": [
-      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-650-extra-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-651-extra-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-652-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-653-versaoimpressao.pdf/view",
@@ -84,6 +83,7 @@
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-665-06082026-versaoimpressao-5.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-666-11082026-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-668-versaoimpressao.pdf/view",
+      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-669-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom667/view"
     ],
     "document_count": 20,
