@@ -4,7 +4,7 @@
     "documents": {
       "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/16-edital-de-convocacao-para-prova-fisica-cp-02-2026.pdf/view": {
         "signature": "86931e956e9e19441814ef8a872ecf4d47da8a0a1adaa614748438f2d5e8830c",
-        "checked_at": "2026-08-20T14:47:07+00:00",
+        "checked_at": "2026-08-20T15:47:58+00:00",
         "chars": 11897,
         "failures": 0,
         "label": "documento conhecido",
@@ -28,7 +28,7 @@
       },
       "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/17-edital-de-convocacao-da-heteroidentificacao-presencial-cp-02-2026.pdf/view": {
         "signature": "e39ae0ea0dd8908c289f8218688ec91c710deb6e35f0b69b1ce85648617aa9ba",
-        "checked_at": "2026-08-20T14:47:08+00:00",
+        "checked_at": "2026-08-20T15:48:02+00:00",
         "chars": 6968,
         "failures": 0,
         "label": "documento conhecido",
@@ -52,7 +52,7 @@
       },
       "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/18-edital-de-retificacao-da-convocacao-para-prova-fisica-cp-02-2026.pdf/view": {
         "signature": "e339e8ecd217949f9f7d051fc9d9ad03be20ccd60df68b229a0c4f5890d6b34b",
-        "checked_at": "2026-08-20T14:47:08+00:00",
+        "checked_at": "2026-08-20T15:48:02+00:00",
         "chars": 1033,
         "failures": 0,
         "label": "documento conhecido",
@@ -76,7 +76,7 @@
       },
       "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/19-edital-de-resultado-de-heteroidentificacao-cp-02-2026.pdf/view": {
         "signature": "6a0a54ce511111fd2e84391539dc93156894788403a89cd0df34f1ad3551b8fb",
-        "checked_at": "2026-08-20T14:47:09+00:00",
+        "checked_at": "2026-08-20T15:48:03+00:00",
         "chars": 2715,
         "failures": 0,
         "label": "documento conhecido",
@@ -100,7 +100,7 @@
       },
       "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/20-edital-de-divulgacao-da-classificacao-preliminar-ass-e-inspetor.pdf/view": {
         "signature": "fcc69d3ce781b27ffd26241a68d06dd73bdac3fad318b77cf6a146edd29f72b7",
-        "checked_at": "2026-08-20T14:47:10+00:00",
+        "checked_at": "2026-08-20T15:48:05+00:00",
         "chars": 18944,
         "failures": 0,
         "label": "documento conhecido",
@@ -124,7 +124,7 @@
       },
       "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/minuta-do-edital-de-resultado-dos-recursos-de-isencao-de-pagamento.pdf/view": {
         "signature": "641a8aa05a6c765d8ea75631044d3fada189051e6d47b30ff94ed0760fb9e958",
-        "checked_at": "2026-08-20T14:47:10+00:00",
+        "checked_at": "2026-08-20T15:48:05+00:00",
         "chars": 920,
         "failures": 0,
         "label": "documento conhecido",
@@ -147,14 +147,14 @@
         "content_url": "https://www.saovicente.sp.gov.br/institucional/concursos/concurso-no-02-2026/minuta-do-edital-de-resultado-dos-recursos-de-isencao-de-pagamento.pdf"
       }
     },
-    "checked_at": "2026-08-20T14:47:10+00:00"
+    "checked_at": "2026-08-20T15:48:05+00:00"
   },
   "sv_ibam_02_2026": {
     "label": "IBAM — São Vicente 02/2026",
     "documents": {
       "https://anexos-r2.selecao.net.br/uploads/810/concursos/134/anexos/77a4a4c5-274e-4efe-bb06-acf1ef0ba31e.pdf": {
         "signature": "e756b1ee2defc6a1d1b489161b6f69b1d91c8f1276524ada923e7d4fcc085d56",
-        "checked_at": "2026-08-20T14:47:11+00:00",
+        "checked_at": "2026-08-20T15:48:06+00:00",
         "chars": 18317,
         "failures": 0,
         "label": "23 — Edital de Divulgação da Classificação Final",
@@ -177,7 +177,7 @@
       },
       "https://anexos-r2.selecao.net.br/uploads/810/concursos/134/anexos/f88b5ba9-d779-4130-af51-695b13e24dfc.pdf": {
         "signature": "e096a82736579b955103723777545ac6b699ff122c7c225a2fdcea7e4e5ec831",
-        "checked_at": "2026-08-20T14:47:11+00:00",
+        "checked_at": "2026-08-20T15:48:06+00:00",
         "chars": 1720,
         "failures": 0,
         "label": "24 — Despacho de Homologação Parcial",
@@ -199,14 +199,14 @@
         }
       }
     },
-    "checked_at": "2026-08-20T14:47:11+00:00"
+    "checked_at": "2026-08-20T15:48:06+00:00"
   },
   "sv_bom": {
     "label": "PMSV — Boletim Oficial",
     "documents": {
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-663-extra-versaoimpressao.pdf/view": {
         "signature": "dae455d29afb8cd5d4dfe227a114fd81155e847abf5935b4c3c254f555932ea3",
-        "checked_at": "2026-08-20T14:47:14+00:00",
+        "checked_at": "2026-08-20T15:48:08+00:00",
         "chars": 2698,
         "failures": 0,
         "label": "documento conhecido",
@@ -230,7 +230,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-664-04082026-versaoimpressao.pdf/view": {
         "signature": "d87b38db3b3bb4b0d243a303c944e1c26470b939f8aec3afea29b57fb413b755",
-        "checked_at": "2026-08-20T14:47:18+00:00",
+        "checked_at": "2026-08-20T15:48:14+00:00",
         "chars": 446131,
         "failures": 0,
         "label": "documento conhecido",
@@ -254,7 +254,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-665-06082026-versaoimpressao-5.pdf/view": {
         "signature": "09d1772a99b4b54660a58b3449a11fd6443378d1838f011db405db5e9f936630",
-        "checked_at": "2026-08-20T14:47:23+00:00",
+        "checked_at": "2026-08-20T15:48:21+00:00",
         "chars": 421138,
         "failures": 0,
         "label": "documento conhecido",
@@ -278,7 +278,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-666-11082026-versaoimpressao.pdf/view": {
         "signature": "1a60423d0696901efb4516561956deae6b7ebc8bf9d2987082aea3302c5fe8c9",
-        "checked_at": "2026-08-20T14:47:27+00:00",
+        "checked_at": "2026-08-20T15:48:25+00:00",
         "chars": 139389,
         "failures": 0,
         "label": "documento conhecido",
@@ -302,7 +302,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-668-versaoimpressao.pdf/view": {
         "signature": "994b7f7618363e6e7415466e2dd019aff4ad19c0022cd49f4c5feb85c9f03774",
-        "checked_at": "2026-08-20T14:47:43+00:00",
+        "checked_at": "2026-08-20T15:48:32+00:00",
         "chars": 382500,
         "failures": 0,
         "label": "documento conhecido",
@@ -326,7 +326,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom667/view": {
         "signature": "4068fb32d60292e9f10f4b997da31fac31cf3df3019b49faca87625b2a84f736",
-        "checked_at": "2026-08-20T14:47:45+00:00",
+        "checked_at": "2026-08-20T15:48:34+00:00",
         "chars": 162903,
         "failures": 0,
         "label": "documento conhecido",
@@ -348,14 +348,14 @@
         }
       }
     },
-    "checked_at": "2026-08-20T14:47:45+00:00"
+    "checked_at": "2026-08-20T15:48:34+00:00"
   },
   "pg_diario": {
     "label": "PG — Diário Oficial Eletrônico",
     "documents": {
       "https://plenussistemas.dioenet.com.br/uploads/view/36951?utm_edicao=440": {
         "signature": "1ed0cddd5183197e15c98e3096d001746116e3e493144bb72b38aa2407256205",
-        "checked_at": "2026-08-20T14:47:55+00:00",
+        "checked_at": "2026-08-20T15:48:51+00:00",
         "chars": 125343,
         "failures": 0,
         "label": "documento conhecido",
@@ -379,7 +379,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/36970?utm_edicao=441": {
         "signature": "4f48feec92583454d518ef187aa5b2d5c34c7ac3891c0b14af274b943ae0dfef",
-        "checked_at": "2026-08-20T14:47:56+00:00",
+        "checked_at": "2026-08-20T15:48:54+00:00",
         "chars": 16152,
         "failures": 0,
         "label": "documento conhecido",
@@ -403,7 +403,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/36986?utm_edicao=442": {
         "signature": "9a21b8d50a5ab4c868f1097b38066b8b6ff5f379e8c12d4e311a08b962fdf6ca",
-        "checked_at": "2026-08-20T14:48:02+00:00",
+        "checked_at": "2026-08-20T15:49:03+00:00",
         "chars": 48437,
         "failures": 0,
         "label": "documento conhecido",
@@ -427,7 +427,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37010?utm_edicao=443": {
         "signature": "5ed921664872836903d3fb47156c3ccdf186359d54d9beae605e9a8cd7d7caa7",
-        "checked_at": "2026-08-20T14:48:05+00:00",
+        "checked_at": "2026-08-20T15:49:08+00:00",
         "chars": 26854,
         "failures": 0,
         "label": "documento conhecido",
@@ -451,7 +451,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37019?utm_edicao=444_extra": {
         "signature": "c76279c1175f22f8a2086bf6c8214a672f02096aeb504847a2e52b64d8c4dc48",
-        "checked_at": "2026-08-20T14:48:07+00:00",
+        "checked_at": "2026-08-20T15:49:10+00:00",
         "chars": 11732,
         "failures": 0,
         "label": "documento conhecido",
@@ -475,7 +475,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37033?utm_edicao=445": {
         "signature": "6a188209572dbcdd82fe6acf0b3107dfa0cfe9e05c1bbfe77fc7812bdda851b1",
-        "checked_at": "2026-08-20T14:48:12+00:00",
+        "checked_at": "2026-08-20T15:49:21+00:00",
         "chars": 65849,
         "failures": 0,
         "label": "documento conhecido",
@@ -498,11 +498,11 @@
         "content_url": "https://plenussistemas.dioenet.com.br/public/uploads/diarios/2026/08/a925f83535c807de1cb4e342117063d9.pdf"
       }
     },
-    "checked_at": "2026-08-20T14:48:12+00:00"
+    "checked_at": "2026-08-20T15:49:21+00:00"
   },
   "_meta": {
     "audit_version": 6,
-    "checked_at": "2026-08-20T14:48:12+00:00",
+    "checked_at": "2026-08-20T15:49:21+00:00",
     "sources": 4,
     "seeded_documents_checked": 2,
     "failures": 0
