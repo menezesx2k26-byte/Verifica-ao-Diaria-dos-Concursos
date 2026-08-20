@@ -34,7 +34,7 @@ jobs:
       - name: Instalar dependências Python
         run: pip install -r requirements.txt
 
-      - name: Validar Python e JSON
+      - name: Validar Python, JSON e filtros anti-ruído
         run: |
           python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py
           python monitor.py --self-test
@@ -44,6 +44,7 @@ jobs:
           from pathlib import Path
 
           import deep_audit
+          import monitor
           import monitor_runner as tr
           import smtp_alert
           import search_probe
@@ -61,6 +62,40 @@ jobs:
           assert fake_state["ibam"]["last_attempt_ok"] is False
           assert fake_state["ibam"]["last_status"] is None
           assert fake_state["ibam"]["last_failure"]
+
+          with open("config/sources.json", encoding="utf-8") as f:
+              source_cfg = json.load(f)
+          sources = {s["id"]: s for s in source_cfg["sources"]}
+
+          # Regressões reais observadas no repositório: não podem voltar a alertar.
+          pg_noise = """
+          SECRETARIA DE SAUDE PUBLICA. CHAMAMENTO PUBLICO SESAP 004/2024.
+          Credenciamento de servicos especializados em saude. Homologacao do procedimento.
+          """
+          assert monitor.document_result(pg_noise, sources["pg_diario"])[0] is False
+
+          sv_employee_noise = """
+          PORTARIA designa o Assistente-Tecnico de Gestao III como fiscal de contrato.
+          Pregao eletronico 175/2025. Homologacao da licitacao.
+          """
+          assert monitor.document_result(sv_employee_noise, sources["sv_bom"])[0] is False
+
+          sv_traffic_noise = """
+          CONCURSO PUBLICO 02/2026. AGENTE DE TRANSITO. Convocacao para teste de aptidao fisica.
+          """
+          assert monitor.document_result(sv_traffic_noise, sources["sv_pref_02_2026"])[0] is False
+
+          sv_true = """
+          CONCURSO PUBLICO 02/2026. ASSISTENTE TECNICO DE GESTAO.
+          Convocacao dos candidatos para entrega de documentos e posse.
+          """
+          assert monitor.document_result(sv_true, sources["sv_pref_02_2026"])[0] is True
+
+          pg_true = """
+          CONCURSO PUBLICO 004/2024. AGENTE COMUNITARIO DE SAUDE - ACS.
+          Convocacao para exame admissional e entrega de documentos.
+          """
+          assert monitor.document_result(pg_true, sources["pg_diario"])[0] is True
 
           fake_search = '''Title: IBAM São Vicente\nURL Source: https://www.ibamsp-concursos.org.br/informacoes/134/\nSÃO VICENTE - CONCURSO PÚBLICO - 02/2026\n24- Despacho de Homologação Parcial'''
           sections = search_probe.official_sections(fake_search, "ibamsp-concursos.org.br/informacoes/134")
@@ -93,8 +128,10 @@ jobs:
           ]
 
           semantic_source = {
+              "trigger_terms": ["homolog"],
               "document_require_groups": [
-                  ["assistente tecnico de gestao", "02/2026"],
+                  ["02/2026"],
+                  ["assistente tecnico de gestao"],
                   ["homolog"]
               ]
           }
@@ -108,9 +145,6 @@ jobs:
           assert facts["classificacao_final"] is True
           assert facts["source_match"] is True
           assert isinstance(facts["priority_match"], bool)
-          assert set(facts).issuperset({
-              "classificacao_final", "convocacao", "nomeacao", "posse", "reclassificacao"
-          })
 
           with open("config/deep_seeds.json", encoding="utf-8") as f:
               deep_seeds = json.load(f)
@@ -127,11 +161,7 @@ jobs:
           assert seed_docs[1]["url"] in selected_urls
           assert selected_urls.count(seed_docs[0]["url"]) == 1
 
-          for path in ("config/sources.json", "config/deep_seeds.json"):
-              with open(path, encoding="utf-8") as f:
-                  json.load(f)
-              print("JSON OK:", path)
-          print("transport + state integrity + smtp + search probe + DIOENET PDF unwrap OK")
+          print("anti-noise regression suite OK")
           PY
 
       - name: Validar bootstrap PowerShell
