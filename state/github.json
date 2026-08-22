@@ -93,9 +93,9 @@
     "last_attempt_ok": true
   },
   "pg_concursos_004_2024": {
-    "failures": 0,
+    "failures": 1,
     "resolved_url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187",
-    "last_status": 200,
+    "last_status": null,
     "context_sigs": [],
     "context_count": 0,
     "document_urls": [],
@@ -103,25 +103,16 @@
     "parser_version": 4,
     "transport": "direct",
     "last_ok": "2026-08-19T14:03:55+00:00",
-    "last_attempt_ok": true
+    "last_attempt_ok": false,
+    "last_error": "falha ao buscar https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187: HTTPSConnectionPool(host='www.praiagrande.sp.gov.br', port=443): Max retries exceeded with url: /administracao/concurso_publico.asp?cd_pagina=187 (Caused by ConnectTimeoutError(<HTTPSConnection(host='www.praiagrande.sp.gov.br', port=443) at 0x7f2f91fc5d00>, 'Connection to www.praiagrande.sp.gov.br timed out. (connect timeout=25)'))",
+    "last_failure": "2026-08-22T10:47:13+00:00"
   },
   "pg_diario": {
     "failures": 0,
     "resolved_url": "https://plenussistemas.dioenet.com.br/list/praia-grande",
     "last_status": 200,
-    "document_urls": [
-      "https://plenussistemas.dioenet.com.br/uploads/view/36908?utm_edicao=438",
-      "https://plenussistemas.dioenet.com.br/uploads/view/36928?utm_edicao=439",
-      "https://plenussistemas.dioenet.com.br/uploads/view/36951?utm_edicao=440",
-      "https://plenussistemas.dioenet.com.br/uploads/view/36970?utm_edicao=441",
-      "https://plenussistemas.dioenet.com.br/uploads/view/36986?utm_edicao=442",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37010?utm_edicao=443",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37019?utm_edicao=444_extra",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37033?utm_edicao=445",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37053?utm_edicao=446",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37060?utm_edicao=447_extra"
-    ],
-    "document_count": 10,
+    "document_urls": [],
+    "document_count": 0,
     "context_sigs": [],
     "context_count": 0,
     "parser_version": 4,
