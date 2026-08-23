@@ -62,7 +62,7 @@ def stable_id(source_id: str, url: str, title: str) -> str:
 
 def fetch(url: str) -> requests.Response:
     r = requests.get(url, headers={
-        "User-Agent": "ConcursosWatch-NewContests/2.0",
+        "User-Agent": "ConcursosWatch-NewContests/2.1",
         "Accept-Language": "pt-BR,pt;q=0.9",
         "Cache-Control": "no-cache",
     }, timeout=TIMEOUT, allow_redirects=True)
@@ -102,9 +102,9 @@ def parse_dates(text: str) -> tuple[str, str]:
     end = ""
     for pos, value in dates:
         before = low[max(0, pos - 45):pos]
-        if any(k in before for k in ("ate ", "até ", "termin", "encerra", "fim", "final")):
+        if any(k in before for k in ("ate ", "termin", "encerra", "fim", "final")):
             end = value
-        elif any(k in before for k in ("de ", "inicio", "início", "abertura")) and not start:
+        elif any(k in before for k in ("de ", "inicio", "abertura")) and not start:
             start = value
     if not end:
         end = dates[-1][1]
@@ -126,11 +126,11 @@ def classify(text: str, end_date: str) -> dict:
     else:
         kind = "edital"
 
-    if any(x in low for x in ("nivel medio", "ensino medio", "médio", "medio completo")):
+    if any(x in low for x in ("nivel medio", "ensino medio", "medio completo")):
         education = "nível médio"
-    elif any(x in low for x in ("nivel tecnico", "ensino tecnico", "técnico", "tecnico")):
+    elif any(x in low for x in ("nivel tecnico", "ensino tecnico", "tecnico")):
         education = "nível técnico"
-    elif any(x in low for x in ("superior", "graduacao", "graduação", "licenciatura", "bacharel")):
+    elif any(x in low for x in ("superior", "graduacao", "licenciatura", "bacharel")):
         education = "nível superior"
     else:
         education = ""
@@ -138,11 +138,11 @@ def classify(text: str, end_date: str) -> dict:
     area = ""
     areas = [
         (("matematica",), "Matemática"),
-        (("mecatronica", "automacao", "automação"), "Mecatrônica"),
-        (("tecnologia da informacao", "informática", "informatica", " ti ", "analista de sistemas"), "TI"),
-        (("administrativo", "administracao", "administração", "assistente tecnico", "assistente-técnico"), "Administrativo"),
+        (("mecatronica", "automacao"), "Mecatrônica"),
+        (("tecnologia da informacao", "informatica", " ti ", "analista de sistemas"), "TI"),
+        (("administrativo", "administracao", "assistente tecnico"), "Administrativo"),
         (("professor", "docente"), "Docência"),
-        (("laboratorio", "laboratório"), "Laboratório"),
+        (("laboratorio",), "Laboratório"),
     ]
     for terms, value in areas:
         if any(t in f" {low} " for t in terms):
@@ -150,9 +150,9 @@ def classify(text: str, end_date: str) -> dict:
             break
 
     status = "detected"
-    if any(x in low for x in ("inscricoes abertas", "inscrições abertas", "abertura de inscricoes", "abertura de inscrições")):
+    if any(x in low for x in ("inscricoes abertas", "abertura de inscricoes", "prazo de inscricoes", "prorrogacao do prazo de inscricoes")):
         status = "open"
-    elif any(x in low for x in ("autorizacao", "autorização", "comissao", "comissão", "banca definida", "contratacao de banca", "contratação de banca")):
+    elif any(x in low for x in ("autorizacao", "comissao", "banca definida", "contratacao de banca")):
         status = "announced"
     if end_date:
         try:
@@ -166,6 +166,29 @@ def classify(text: str, end_date: str) -> dict:
         except ValueError:
             pass
     return {"type": kind, "education": education, "area": area, "status": status}
+
+
+def is_stale_candidate(title: str, context: str, href: str, status: str, end_date: str) -> bool:
+    """Reject obviously historical/expired records from archive-heavy official pages."""
+    if status == "closed":
+        return True
+    current = date.today().year
+    corpus = fold(f"{title} {context} {href}")
+    years = [int(y) for y in re.findall(r"\b(19\d{2}|20\d{2})\b", corpus)]
+    if years and max(years) < current - 1:
+        return True
+    # Common archive format: "Edital 141/07" or "edital-141-2007".
+    short_years = [int(y) for y in re.findall(r"(?:edital[^\n]{0,30}|/|[-_])(\d{2})(?:\D|$)", corpus)]
+    interpreted = [2000 + y for y in short_years if 0 <= y <= 99]
+    if interpreted and max(interpreted) < current - 1:
+        return True
+    if end_date:
+        try:
+            if date.fromisoformat(end_date) < date.today():
+                return True
+        except ValueError:
+            pass
+    return False
 
 
 def source_uf(source: dict) -> str:
@@ -198,7 +221,8 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
         combined = fold(f"{context} {href}")
         if not any(fold(term) in combined for term in include_terms):
             continue
-        if any(fold(term) in combined for term in exclude_terms) and not any(x in combined for x in ("edital de abertura", "inscricoes abertas", "inscrições abertas")):
+        explicit_opening = any(x in combined for x in ("edital de abertura", "inscricoes abertas", "abertura de inscricoes", "prazo de inscricoes"))
+        if any(fold(term) in combined for term in exclude_terms) and not explicit_opening:
             continue
         host = (parsed.hostname or "").casefold()
         if host != source_host and not any(x in host for x in OFFICIAL_EXTERNAL_HOST_FRAGMENTS):
@@ -209,6 +233,8 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
         clean_title = title[:240] or parent[:240] or "Novo edital/processo seletivo"
         start_date, end_date = parse_dates(context)
         cls = classify(context, end_date)
+        if is_stale_candidate(clean_title, context, href, cls["status"], end_date):
+            continue
         remuneration = parse_money(context)
         fee = ""
         fee_match = re.search(r"(?:taxa|inscri(?:ç|c)ao)[^R]{0,35}(R\$\s*[\d.]+(?:,\d{2})?)", context, re.I)
@@ -257,7 +283,7 @@ def create_issue(repo: str, token: str, item: dict) -> None:
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     details = [item.get("education"), item.get("remuneration"), f"até {item['end_date']}" if item.get("end_date") else None]
     body = (
-        f"Novo edital/processo seletivo detectado em fonte oficial.\n\n"
+        "Novo edital/processo seletivo detectado em fonte oficial.\n\n"
         f"**Órgão:** {item.get('organization') or item['source']}\n"
         f"**Local:** {item.get('city') or 'não informado'}\n"
         f"**Esfera:** {item.get('scope') or 'não classificada'}\n"
@@ -298,15 +324,21 @@ def main() -> int:
             health.append({"id": source.get("id", ""), "label": source.get("label", ""), "ok": False, "item_count": 0, "checked_at": stamp, "url": source.get("url", ""), "error": err})
             print(f"[NEW] falha em {source.get('label')}: {exc}")
 
-    merged = dict(old_items)
+    # Keep only records still present in the current official-source crawl.
+    # Historical links disappearing from the active page must not live forever in the app.
+    merged: dict[str, dict] = {}
     for item_id, item in found.items():
-        previous = merged.get(item_id, {})
+        previous = old_items.get(item_id, {})
         merged[item_id] = {**item, "first_seen": previous.get("first_seen") or stamp, "last_seen": stamp}
 
     new_ids = set(found) - old_seen
     new_items = [found[i] for i in new_ids]
     max_items = int(cfg.get("max_items") or 250)
-    items = sorted(merged.values(), key=lambda x: (int(x.get("priority", 50)), x.get("status") in {"open", "closing_soon"}, x.get("first_seen", "")), reverse=True)[:max_items]
+    items = sorted(
+        merged.values(),
+        key=lambda x: (x.get("status") in {"open", "closing_soon"}, int(x.get("priority", 50)), x.get("first_seen", "")),
+        reverse=True,
+    )[:max_items]
     seen_ids = list(dict.fromkeys(list(old_seen) + list(found)))
     max_seen = int(cfg.get("max_seen_urls") or 5000)
 
