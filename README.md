@@ -43,7 +43,8 @@ A camada GitHub lê novos PDFs quando possível e alerta também quando um docum
 - página do processo de graduação no CIEE;
 - monitor separado em `PGFN Estágio Watch`, executado a cada 15 minutos;
 - foco em regras da prova online: consulta, materiais externos, IA/ferramentas externas, troca de abas, tempo, desconexão, fiscalização, eliminação e retificações;
-- estado independente em `state/pgfn.json`, evitando misturar alterações da PGFN com os concursos prioritários.
+- estado independente em `state/pgfn.json`, evitando misturar alterações da PGFN com os concursos prioritários;
+- alertas usam os canais externos já configurados no repositório; GitHub Issue não é tratado como canal principal.
 
 ## Segurança e prioridade pessoal
 
