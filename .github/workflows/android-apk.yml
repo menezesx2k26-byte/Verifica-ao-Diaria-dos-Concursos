@@ -34,12 +34,18 @@ jobs:
           gradle-version: "8.10.2"
 
       - name: Build debug APK
-        run: gradle -p android :app:assembleDebug --stacktrace
+        id: build_apk
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle -p android :app:assembleDebug --stacktrace 2>&1 | tee android-build.log
 
       - name: Prepare APK
+        if: steps.build_apk.outcome == 'success'
         run: cp android/app/build/outputs/apk/debug/app-debug.apk ConcursosWatch.apk
 
       - uses: actions/upload-artifact@v4
+        if: steps.build_apk.outcome == 'success'
         with:
           name: ConcursosWatch-APK
           path: ConcursosWatch.apk
@@ -47,6 +53,8 @@ jobs:
           retention-days: 30
 
       - name: Publish APK release
+        id: publish_apk
+        if: steps.build_apk.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -59,3 +67,38 @@ jobs:
               --title "Concursos Watch Android v1.2.0" \
               --notes "APK conectado ao monitor GitHub Actions, com alertas filtrados e feed ampliado de concursos novos em fontes oficiais, incluindo federal e Sul com prioridade para Santa Catarina."
           fi
+
+      - name: Persist build diagnostics
+        if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build_apk.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish_apk.outcome }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          log = pathlib.Path('android-build.log')
+          tail = ''
+          if log.exists():
+              tail = '\n'.join(log.read_text(errors='replace').splitlines()[-80:])
+          status = {
+              'build_outcome': os.environ.get('BUILD_OUTCOME',''),
+              'publish_outcome': os.environ.get('PUBLISH_OUTCOME',''),
+              'run_id': os.environ.get('RUN_ID',''),
+              'run_attempt': os.environ.get('RUN_ATTEMPT',''),
+              'sha': os.environ.get('SHA',''),
+              'release_url': 'https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v1.2.0',
+              'build_log_tail': tail,
+          }
+          pathlib.Path('state').mkdir(exist_ok=True)
+          pathlib.Path('state/android_build.json').write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n')
+          PY
+          git config user.name "concursos-watch[bot]"
+          git config user.email "concursos-watch[bot]@users.noreply.github.com"
+          git add state/android_build.json
+          git commit -m "chore(android): record build status" || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
