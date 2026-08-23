@@ -14,6 +14,12 @@ CONFIG = Path(os.getenv("NEW_CONTESTS_CONFIG", "config/new_contests_sources.json
 STATE = Path(os.getenv("NEW_CONTESTS_STATE", "state/new_contests.json"))
 TIMEOUT = 25
 
+OFFICIAL_EXTERNAL_HOST_FRAGMENTS = (
+    "ibam", "vunesp", "ciee", "gov.br", "fgv", "fundatec", "cebraspe",
+    "fcc.org.br", "institutoaocp", "institutoavaliar", "avalia.org.br",
+    "objetivas.com.br", "legalleconcursos", "fepese", "fundacaofafipa",
+)
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -43,7 +49,7 @@ def save(path: Path, obj) -> None:
 
 def fetch(url: str) -> requests.Response:
     headers = {
-        "User-Agent": "ConcursosWatch-NewContests/1.1",
+        "User-Agent": "ConcursosWatch-NewContests/1.2",
         "Accept-Language": "pt-BR,pt;q=0.9",
         "Cache-Control": "no-cache",
     }
@@ -75,7 +81,7 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
         if any(fold(term) in combined for term in exclude_terms):
             continue
         host = (parsed.hostname or "").casefold()
-        if host != source_host and not any(x in host for x in ("ibam", "vunesp", "ciee", "gov.br", "fgv", "fundatec", "cebraspe")):
+        if host != source_host and not any(x in host for x in OFFICIAL_EXTERNAL_HOST_FRAGMENTS):
             continue
         if href in seen:
             continue
@@ -176,12 +182,13 @@ def main() -> int:
         reverse=True,
     )[:max_items]
     seen_urls = list(dict.fromkeys(list(old_seen) + list(found.keys())))
+    max_seen_urls = int(cfg.get("max_seen_urls") or 3000)
 
     state = {
         "updated_at": stamp,
         "first_run_baseline": first_run,
         "items": items,
-        "seen_urls": seen_urls[-3000:],
+        "seen_urls": seen_urls[-max_seen_urls:],
         "failures": failures,
     }
     save(STATE, state)
@@ -190,7 +197,7 @@ def main() -> int:
     token = os.getenv("GITHUB_TOKEN", "")
     if new_items and not first_run and repo and token:
         ensure_label(repo, token, "new-contest", "1f6feb", "Novo concurso/processo seletivo detectado em fonte oficial")
-        for item in sorted(new_items, key=lambda x: int(x.get("priority", 50)), reverse=True)[:20]:
+        for item in sorted(new_items, key=lambda x: int(x.get("priority", 50)), reverse=True)[:24]:
             try:
                 create_issue(repo, token, item)
                 print(f"[NEW] issue criada: {item['title']}")
