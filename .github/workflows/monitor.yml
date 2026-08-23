@@ -20,10 +20,11 @@ on:
   schedule:
     - cron: "7,22,37,52 * * * *"
 
-# GitHub é infraestrutura, não canal de alerta. O monitor grava estado, mas não
-# abre/atribui Issues automáticas a cada detecção.
+# GitHub também funciona como barramento de eventos para o APK: cada alerta
+# relevante pode virar uma Issue com label watch-alert, consumida pelo app.
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: concursos-watch-github
@@ -69,6 +70,7 @@ jobs:
           WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
           WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
           WATCH_TEST_ALERT: ${{ inputs.send_test_alert || 'false' }}
+          ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
         run: python monitor_runner.py
 
       - name: Persistir estado apenas quando mudou
