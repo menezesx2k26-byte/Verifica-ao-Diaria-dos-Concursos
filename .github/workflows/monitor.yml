@@ -15,6 +15,7 @@ on:
       - "monitor_runner.py"
       - "smtp_alert.py"
       - "new_contests.py"
+      - "canonicalize_contests.py"
       - "generic_health.py"
       - "priority_scanner.py"
       - "publish_api_snapshot.py"
@@ -52,7 +53,7 @@ jobs:
       - name: Testar parsers, monitor e transportes
         run: |
           python monitor.py --self-test
-          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py generic_health.py priority_scanner.py publish_api_snapshot.py
+          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py canonicalize_contests.py generic_health.py priority_scanner.py publish_api_snapshot.py
           python -m unittest discover -s tests -p "test_*.py" -v
 
       - name: Verificar acompanhamentos prioritários existentes
@@ -87,6 +88,9 @@ jobs:
           ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
         run: python new_contests.py
 
+      - name: Estabilizar identidade dos concursos
+        run: python canonicalize_contests.py
+
       - name: Validar saúde semântica das fontes amplas
         run: python generic_health.py
 
@@ -103,7 +107,7 @@ jobs:
           git config user.name "concursos-watch[bot]"
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
           changed=0
-          for file in state/github.json state/new_contests.json state/priority_events.json state/source_health_history.json; do
+          for file in state/github.json state/new_contests.json state/priority_events.json state/source_health_history.json state/contest_identity_history.json; do
             if [[ -f "$file" ]] && [[ -n "$(git status --porcelain -- "$file")" ]]; then
               git add "$file"
               changed=1
