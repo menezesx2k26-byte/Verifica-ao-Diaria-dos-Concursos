@@ -36,7 +36,7 @@ class ContestRepository(context: Context) {
             val feed = remote.fetchContestFeed()
             health = feed.health
             val generation = System.currentTimeMillis()
-            val existing = db.contestDao().visible().associateBy { it.id }
+            val existing = db.contestDao().all().associateBy { it.id }
             val incoming = feed.items.map { item ->
                 val old = existing[item.id]
                 if (old == null && !contestBaseline) newContestIds += item.id
