@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "build_outcome": "skipped",
   "production_signing_configured": false,
-  "run_id": "32672210981",
+  "run_id": "32672237015",
   "run_attempt": "1",
-  "sha": "9ac29a947f9c5b9052c7564694a2d9c091d13aa2",
+  "sha": "6999636f4f5cfb275fa1b012bd1c595c0de26783",
   "dev_release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v2.0.0-dev",
   "production_release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v2.0.0",
   "build_log_tail": ""
