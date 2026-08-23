@@ -25,6 +25,7 @@ data class Contest(
     val priority: Int,
     val favorite: Boolean = false,
     val unread: Boolean = false,
+    val active: Boolean = true,
 )
 
 data class AlertItem(
@@ -40,11 +41,18 @@ data class AlertItem(
 data class SourceHealth(
     val id: String,
     val label: String,
-    val ok: Boolean,
+    val httpOk: Boolean,
+    val parserOk: Boolean,
+    val semanticOk: Boolean,
     val itemCount: Int,
+    val expectedMin: Int,
     val checkedAt: String,
+    val lastSuccessAt: String,
+    val fingerprint: String,
     val error: String,
-)
+) {
+    val ok: Boolean get() = httpOk && parserOk && semanticOk
+}
 
 data class SyncResult(
     val contestsOk: Boolean,
