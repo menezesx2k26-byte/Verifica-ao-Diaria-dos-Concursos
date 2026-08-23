@@ -17,6 +17,7 @@ from pypdf import PdfReader
 
 STATE = Path("state/priority_events.json")
 TIMEOUT = 30
+PERSON_TERMS = ("gabriel veloso menezes",)
 
 
 def now() -> str:
@@ -116,7 +117,12 @@ def extract_pdf(data: bytes) -> str:
 
 
 def fetch_document(url: str) -> tuple[bytes, str, str]:
-    r = requests.get(url, timeout=TIMEOUT, headers={"User-Agent": "ConcursosWatch-Priority/3.0", "Cache-Control": "no-cache"}, allow_redirects=True)
+    r = requests.get(
+        url,
+        timeout=TIMEOUT,
+        headers={"User-Agent": "ConcursosWatch-Priority/3.1", "Cache-Control": "no-cache"},
+        allow_redirects=True,
+    )
     r.raise_for_status()
     data = r.content
     ctype = (r.headers.get("content-type") or "").lower()
@@ -124,7 +130,8 @@ def fetch_document(url: str) -> tuple[bytes, str, str]:
     if is_pdf:
         return data, extract_pdf(data), "pdf"
     soup = BeautifulSoup(data, "html.parser")
-    for n in soup(["script", "style", "noscript", "svg"]): n.decompose()
+    for n in soup(["script", "style", "noscript", "svg"]):
+        n.decompose()
     return data, " ".join(soup.stripped_strings), "html"
 
 
@@ -138,18 +145,33 @@ def candidate_links(base_url: str, html: str, watch: Watch) -> list[tuple[str, s
         context = f"{title} {parent}"
         href = urljoin(base_url, a.get("href"))
         if groups_match(context + " " + href, watch.groups) and href not in seen:
-            seen.add(href); out.append((href, title or parent[:180]))
+            seen.add(href)
+            out.append((href, title or parent[:180]))
     return out
 
 
-def detect_events(watch: Watch, source_id: str, text: str, url: str, doc_hash: str, stamp: str) -> list[dict]:
-    t = fold(text)
+def detect_events(watch: Watch, source_id: str, context: str, url: str, doc_hash: str, stamp: str) -> list[dict]:
+    t = fold(context)
     out = []
+    if not groups_match(context, watch.groups):
+        return out
+
+    for person in PERSON_TERMS:
+        p = fold(person)
+        if p in t:
+            fingerprint = stable(watch.contest_id, "candidate_mention", doc_hash, p)
+            pos = t.find(p)
+            out.append({
+                "id": stable("event", fingerprint), "contest_id": watch.contest_id, "source_id": source_id,
+                "type": "candidate_mention", "title": f"{watch.label} — candidato localizado",
+                "body": t[max(0, pos - 350):pos + 900], "url": url, "priority": 130,
+                "happened_at": stamp, "created_at": stamp, "fingerprint": fingerprint,
+            })
+
     for event_type, priority, terms in EVENT_TERMS:
         matches = [fold(x) for x in terms if fold(x) in t]
-        if not matches: continue
-        # target identity must still be present in the inspected document/context
-        if not groups_match(text, watch.groups): continue
+        if not matches:
+            continue
         fingerprint = stable(watch.contest_id, event_type, doc_hash, ",".join(sorted(matches)))
         sample_pos = min((t.find(x) for x in matches if t.find(x) >= 0), default=0)
         excerpt = t[max(0, sample_pos - 350):sample_pos + 900]
@@ -179,7 +201,8 @@ def scan() -> dict:
                 fingerprint = sha(data)
                 parser_ok = len(fold(text)) > 100
                 semantic_ok = parser_ok and (groups_match(text, watch.groups) if (idx == 0 and watch.expected_on_specific_page) else True)
-                links = candidate_links(source_url, text if kind == "html" else "", watch) if kind == "html" else []
+                html = data.decode("utf-8", errors="replace") if kind == "html" else ""
+                links = candidate_links(source_url, html, watch) if html else []
                 inspected = [(source_url, watch.label, data, text, kind)]
                 for href, title in links[:20]:
                     try:
@@ -190,15 +213,18 @@ def scan() -> dict:
 
                 changed = False
                 for href, title, d, tx, kd in inspected:
-                    h = sha(d); did = stable(source_id, href)
+                    h = sha(d)
+                    did = stable(source_id, href)
                     old = documents.get(did)
-                    if not old or old.get("sha256") != h: changed = True
+                    if not old or old.get("sha256") != h:
+                        changed = True
                     documents[did] = {
                         "id": did, "contest_id": watch.contest_id, "source_id": source_id, "kind": kd,
                         "title": title[:220], "url": href, "sha256": h, "published_at": "", "fetched_at": stamp,
                         "text_excerpt": re.sub(r"\s+", " ", tx)[:12000], "metadata": {"watch": watch.id},
                     }
-                    for event in detect_events(watch, source_id, tx, href, h, stamp):
+                    event_context = f"{title} {href} {tx}"
+                    for event in detect_events(watch, source_id, event_context, href, h, stamp):
                         if event["fingerprint"] not in events:
                             new_events.append(event)
                         events[event["fingerprint"]] = event
@@ -209,7 +235,8 @@ def scan() -> dict:
                     "http_ok": True, "parser_ok": parser_ok, "semantic_ok": semantic_ok,
                     "item_count": len(inspected), "expected_min": 1, "checked_at": stamp,
                     "last_success_at": stamp if semantic_ok else "", "fingerprint": fingerprint,
-                    "scan_status": scan_status if semantic_ok else "PARSER_ERROR", "error": "" if semantic_ok else "conteúdo esperado não confirmado",
+                    "scan_status": scan_status if semantic_ok else "PARSER_ERROR",
+                    "error": "" if semantic_ok else "conteúdo esperado não confirmado",
                 })
             except Exception as exc:
                 health.append({
