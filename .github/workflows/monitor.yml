@@ -89,7 +89,7 @@ jobs:
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
           changed=0
           for file in state/github.json state/new_contests.json; do
-            if [[ -f "$file" ]] && ! git diff --quiet -- "$file"; then
+            if [[ -f "$file" ]] && [[ -n "$(git status --porcelain -- "$file")" ]]; then
               git add "$file"
               changed=1
             fi
