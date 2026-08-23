@@ -43,15 +43,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reload() {
         viewModelScope.launch {
+            val snapshot = state
             val loaded = withContext(Dispatchers.IO) {
                 val health = repo.sourceHealth()
-                state.copy(
+                snapshot.copy(
                     contests = repo.contests(), alerts = repo.alerts(), sourceHealth = health,
                     lastSync = repo.lastSync(), contestError = repo.lastContestError(), alertError = repo.lastAlertError(),
                     sourceCount = repo.sourceCount(), healthySources = health.count { it.ok }, latestRelease = repo.latestKnownRelease(),
                 )
             }
-            state = loaded
+            state = loaded.copy(settings = state.settings, syncing = state.syncing, selectedContest = state.selectedContest)
         }
     }
 
