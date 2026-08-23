@@ -57,6 +57,7 @@ data class SourceHealthEntity(
     @ColumnInfo(name = "checked_at") val checkedAt: String,
     @ColumnInfo(name = "last_success_at") val lastSuccessAt: String,
     val fingerprint: String,
+    @ColumnInfo(name = "scan_status") val scanStatus: String,
     val error: String,
 )
 
