@@ -1,6 +1,7 @@
 package com.menezes.concursoswatch.ui
 
 import android.net.Uri
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
@@ -25,36 +26,24 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-private data class NavItem(
-    val route: String,
-    val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-)
+private data class NavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 @Composable
-fun ConcursosApp(
-    initialUri: String? = null,
-    onInitialUriConsumed: () -> Unit = {},
-    vm: AppViewModel = viewModel(),
-) {
+fun ConcursosApp(initialUri: String? = null, onInitialUriConsumed: () -> Unit = {}, vm: AppViewModel = viewModel()) {
     ConcursosWatchTheme {
         val nav = rememberNavController()
         val current by nav.currentBackStackEntryAsState()
         val route = current?.destination?.route
         val tabs = listOf(
-            NavItem("home", "Início", Icons.Filled.Home),
-            NavItem("alerts", "Alertas", Icons.Filled.Notifications),
-            NavItem("contests", "Concursos", Icons.Filled.Work),
-            NavItem("favorites", "Favoritos", Icons.Filled.Favorite),
+            NavItem("home", "Início", Icons.Filled.Home), NavItem("alerts", "Alertas", Icons.Filled.Notifications),
+            NavItem("contests", "Concursos", Icons.Filled.Work), NavItem("favorites", "Favoritos", Icons.Filled.Favorite),
             NavItem("settings", "Config.", Icons.Filled.Settings),
         )
 
         LaunchedEffect(initialUri) {
             val uri = initialUri?.let(Uri::parse) ?: return@LaunchedEffect
             when (uri.host) {
-                "contest" -> uri.lastPathSegment?.takeIf { it.isNotBlank() }?.let { id ->
-                    nav.navigate("detail/${Uri.encode(id)}") { launchSingleTop = true }
-                }
+                "contest" -> uri.lastPathSegment?.takeIf { it.isNotBlank() }?.let { id -> nav.navigate("detail/${Uri.encode(id)}") { launchSingleTop = true } }
                 "alerts" -> nav.navigate("alerts") { launchSingleTop = true }
             }
             onInitialUriConsumed()
@@ -63,57 +52,26 @@ fun ConcursosApp(
         Scaffold(
             containerColor = AppBg,
             bottomBar = {
-                if (route != "detail/{contestId}") {
-                    NavigationBar(containerColor = Color(0xFF0A0D12)) {
-                        tabs.forEach { item ->
-                            NavigationBarItem(
-                                selected = route == item.route,
-                                onClick = {
-                                    if (route != item.route) {
-                                        nav.navigate(item.route) {
-                                            launchSingleTop = true
-                                            restoreState = true
-                                            popUpTo("home") { saveState = true }
-                                        }
-                                    }
-                                },
-                                icon = { Icon(item.icon, contentDescription = item.label) },
-                                label = { Text(item.label) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = AppPurple,
-                                    selectedTextColor = AppPurple,
-                                    indicatorColor = Color(0xFF241638),
-                                    unselectedIconColor = AppMuted,
-                                    unselectedTextColor = AppMuted,
-                                ),
-                            )
-                        }
+                if (route != "detail/{contestId}") NavigationBar(containerColor = Color(0xFF0A0D12)) {
+                    tabs.forEach { item ->
+                        NavigationBarItem(
+                            selected = route == item.route,
+                            onClick = { if (route != item.route) nav.navigate(item.route) { launchSingleTop = true; restoreState = true; popUpTo("home") { saveState = true } } },
+                            icon = { Icon(item.icon, contentDescription = item.label) }, label = { Text(item.label) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = AppPurple, selectedTextColor = AppPurple, indicatorColor = Color(0xFF241638), unselectedIconColor = AppMuted, unselectedTextColor = AppMuted),
+                        )
                     }
                 }
             },
-        ) { padding ->
-            NavHost(navController = nav, startDestination = "home", modifier = androidx.compose.ui.Modifier.padding(padding)) {
-                composable("home") {
-                    HomeScreen(
-                        vm = vm,
-                        onOpenContests = { nav.navigate("contests") },
-                        onOpenAlerts = { nav.navigate("alerts") },
-                        onDetail = { nav.navigate("detail/${Uri.encode(it.id)}") },
-                    )
-                }
+        ) { paddingValues ->
+            NavHost(navController = nav, startDestination = "home", modifier = androidx.compose.ui.Modifier.padding(paddingValues)) {
+                composable("home") { HomeScreen(vm, { nav.navigate("contests") }, { nav.navigate("alerts") }) { nav.navigate("detail/${Uri.encode(it.id)}") } }
                 composable("alerts") { AlertsScreen(vm) }
-                composable("contests") { ContestListScreen(vm, favoritesOnly = false) { nav.navigate("detail/${Uri.encode(it.id)}") } }
-                composable("favorites") { ContestListScreen(vm, favoritesOnly = true) { nav.navigate("detail/${Uri.encode(it.id)}") } }
+                composable("contests") { ContestListScreen(vm, false) { nav.navigate("detail/${Uri.encode(it.id)}") } }
+                composable("favorites") { ContestListScreen(vm, true) { nav.navigate("detail/${Uri.encode(it.id)}") } }
                 composable("settings") { SettingsScreen(vm) }
-                composable(
-                    route = "detail/{contestId}",
-                    arguments = listOf(navArgument("contestId") { type = NavType.StringType }),
-                ) { entry ->
-                    ContestDetailScreen(
-                        vm = vm,
-                        contestId = Uri.decode(entry.arguments?.getString("contestId") ?: ""),
-                        onBack = { nav.popBackStack() },
-                    )
+                composable("detail/{contestId}", arguments = listOf(navArgument("contestId") { type = NavType.StringType })) { entry ->
+                    ContestDetailScreen(vm, Uri.decode(entry.arguments?.getString("contestId") ?: "")) { nav.popBackStack() }
                 }
             }
         }
