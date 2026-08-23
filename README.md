@@ -1,9 +1,6 @@
 # Verificação redundante dos concursos
 
-Monitor externo focado em dois acompanhamentos prioritários:
-
-- **São Vicente — Concurso nº 02/2026 — Assistente-Técnico de Gestão**
-- **Praia Grande — Concurso nº 004/2024 — Agente Comunitário de Saúde (ACS)**
+Monitor externo focado nos acompanhamentos prioritários de concursos e oportunidades públicas do Gabriel.
 
 ## Arquitetura
 
@@ -14,7 +11,7 @@ Fontes oficiais
    │      ├── Telegram
    │      ├── ntfy
    │      ├── Resend / e-mail
-   │      └── GitHub Issue
+   │      └── Gmail SMTP
    │
    ├── Cloudflare Worker — detector independente + KV (~15 min, intercalado)
    │      ├── Telegram
@@ -40,6 +37,13 @@ A camada GitHub lê novos PDFs quando possível e alerta também quando um docum
 ### Praia Grande
 - página oficial de concursos e processos seletivos;
 - Diário Oficial Eletrônico (DIOENET/Plenus).
+
+### PGFN — estágio nacional 2026
+- página oficial da 1ª Seleção Nacional de Estagiários da PGFN;
+- página do processo de graduação no CIEE;
+- monitor separado em `PGFN Estágio Watch`, executado a cada 15 minutos;
+- foco em regras da prova online: consulta, materiais externos, IA/ferramentas externas, troca de abas, tempo, desconexão, fiscalização, eliminação e retificações;
+- estado independente em `state/pgfn.json`, evitando misturar alterações da PGFN com os concursos prioritários.
 
 ## Segurança e prioridade pessoal
 
