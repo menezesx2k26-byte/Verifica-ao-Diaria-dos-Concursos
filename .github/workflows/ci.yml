@@ -11,6 +11,7 @@ on:
       - "deep_audit.py"
       - "search_probe.py"
       - "new_contests.py"
+      - "generic_health.py"
       - "priority_scanner.py"
       - "publish_api_snapshot.py"
       - "tests/**"
@@ -40,7 +41,7 @@ jobs:
 
       - name: Validar Python e regressões anti-ruído
         run: |
-          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py new_contests.py priority_scanner.py publish_api_snapshot.py
+          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py new_contests.py generic_health.py priority_scanner.py publish_api_snapshot.py
           python monitor.py --self-test
           python -m unittest discover -s tests -p "test_*.py" -v
           python - <<'PY'
@@ -70,7 +71,6 @@ jobs:
           fake_search = '''Title: IBAM São Vicente\nURL Source: https://www.ibamsp-concursos.org.br/informacoes/134/\nSÃO VICENTE - CONCURSO PÚBLICO - 02/2026\n24- Despacho de Homologação Parcial'''
           sections = search_probe.official_sections(fake_search, "ibamsp-concursos.org.br/informacoes/134")
           assert len(sections) == 1
-
           assert deep_audit.audit_content_url("https://www.saovicente.sp.gov.br/x/ato.pdf/view?download=1") == "https://www.saovicente.sp.gov.br/x/ato.pdf?download=1"
 
           watch = ps.WATCHES[1]
