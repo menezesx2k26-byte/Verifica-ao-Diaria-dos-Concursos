@@ -1,9 +1,9 @@
 {
-  "build_outcome": "skipped",
-  "publish_outcome": "skipped",
-  "run_id": "32668652378",
+  "build_outcome": "success",
+  "publish_outcome": "success",
+  "run_id": "32668681401",
   "run_attempt": "1",
-  "sha": "862e2a22ec6cc2442bdd0c4c1ad1fed266c8b9fc",
-  "release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v1.2.0",
-  "build_log_tail": ""
+  "sha": "8c7250b50077369341625c8d68afd7a4ad8f479d",
+  "release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v1.3.0",
+  "build_log_tail": "Starting a Gradle Daemon (subsequent builds will be faster)\n> Task :app:preBuild UP-TO-DATE\n> Task :app:preDebugBuild UP-TO-DATE\n> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE\n> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :app:generateDebugResValues\n> Task :app:checkDebugAarMetadata\n> Task :app:mapDebugSourceSetPaths\n> Task :app:generateDebugResources\n> Task :app:packageDebugResources\n> Task :app:createDebugCompatibleScreenManifests\n> Task :app:mergeDebugResources\n> Task :app:extractDeepLinksDebug\n> Task :app:parseDebugLocalResources\n> Task :app:processDebugMainManifest\n> Task :app:processDebugManifest\n> Task :app:javaPreCompileDebug\n> Task :app:mergeDebugShaders\n> Task :app:compileDebugShaders NO-SOURCE\n> Task :app:generateDebugAssets UP-TO-DATE\n> Task :app:mergeDebugAssets\n> Task :app:compressDebugAssets\n> Task :app:desugarDebugFileDependencies\n> Task :app:processDebugManifestForPackage\n> Task :app:checkDebugDuplicateClasses\n> Task :app:mergeLibDexDebug\n> Task :app:mergeDebugJniLibFolders\n> Task :app:mergeDebugNativeLibs NO-SOURCE\n> Task :app:stripDebugDebugSymbols NO-SOURCE\n> Task :app:processDebugResources\n> Task :app:validateSigningDebug\n> Task :app:writeDebugAppMetadata\n> Task :app:writeDebugSigningConfigVersions\n> Task :app:mergeExtDexDebug\n\n> Task :app:compileDebugKotlin\nw: file:///home/runner/work/Verifica-ao-Diaria-dos-Concursos/Verifica-ao-Diaria-dos-Concursos/android/app/src/main/java/com/menezes/concursoswatch/MainActivity.kt:89:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.\nw: file:///home/runner/work/Verifica-ao-Diaria-dos-Concursos/Verifica-ao-Diaria-dos-Concursos/android/app/src/main/java/com/menezes/concursoswatch/MainActivity.kt:90:16 'var navigationBarColor: Int' is deprecated. Deprecated in Java.\n\n> Task :app:compileDebugJavaWithJavac NO-SOURCE\n> Task :app:dexBuilderDebug\n> Task :app:mergeDebugGlobalSynthetics\n> Task :app:processDebugJavaRes\n> Task :app:mergeProjectDexDebug\n> Task :app:mergeDebugJavaResource\n> Task :app:packageDebug\n> Task :app:createDebugApkListingFileRedirect\n> Task :app:assembleDebug\ngradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/build_apk-1787521805933.json\n\nBUILD SUCCESSFUL in 34s\n33 actionable tasks: 33 executed"
 }
