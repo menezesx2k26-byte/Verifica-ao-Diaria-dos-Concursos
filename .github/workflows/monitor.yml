@@ -15,6 +15,8 @@ on:
       - "monitor_runner.py"
       - "smtp_alert.py"
       - "new_contests.py"
+      - "priority_scanner.py"
+      - "publish_api_snapshot.py"
       - "tests/**"
       - "config/**"
       - "requirements.txt"
@@ -33,7 +35,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,13 +48,13 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Testar parser, monitor e transportes
+      - name: Testar parsers, monitor e transportes
         run: |
           python monitor.py --self-test
-          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py
+          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py priority_scanner.py publish_api_snapshot.py
           python -m unittest discover -s tests -p "test_*.py" -v
 
-      - name: Verificar acompanhamentos prioritários
+      - name: Verificar acompanhamentos prioritários existentes
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -74,12 +76,21 @@ jobs:
           ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
         run: python monitor_runner.py
 
+      - name: Auditoria documental dos três acompanhamentos prioritários
+        run: python priority_scanner.py
+
       - name: Descobrir concursos e processos seletivos novos
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
         run: python new_contests.py
+
+      - name: Publicar snapshot canônico no Worker/D1
+        env:
+          WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
+          CONCURSOS_API_URL: ${{ vars.CONCURSOS_API_URL }}
+        run: python publish_api_snapshot.py
 
       - name: Persistir estados apenas quando mudaram
         shell: bash
@@ -88,15 +99,13 @@ jobs:
           git config user.name "concursos-watch[bot]"
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
           changed=0
-          for file in state/github.json state/new_contests.json; do
+          for file in state/github.json state/new_contests.json state/priority_events.json; do
             if [[ -f "$file" ]] && [[ -n "$(git status --porcelain -- "$file")" ]]; then
               git add "$file"
               changed=1
             fi
           done
-          if [[ "$changed" == "0" ]]; then
-            exit 0
-          fi
+          if [[ "$changed" == "0" ]]; then exit 0; fi
           git commit -m "chore(watch): update monitor state"
           git pull --rebase origin main
           git push origin HEAD:main
@@ -106,9 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           DAY="$(date -u +%d)"
-          if [[ "$DAY" != "01" && "$DAY" != "15" ]]; then
-            exit 0
-          fi
+          if [[ "$DAY" != "01" && "$DAY" != "15" ]]; then exit 0; fi
           date -u +%FT%TZ > .watch-keepalive
           git config user.name "concursos-watch[bot]"
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
