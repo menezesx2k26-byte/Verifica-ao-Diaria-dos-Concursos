@@ -7,6 +7,12 @@
       "url": "https://concurso.ifsp.edu.br/"
     },
     {
+      "id": "tjsp_concursos",
+      "label": "TJSP — Concursos",
+      "city": "Estado de São Paulo",
+      "url": "https://www.tjsp.jus.br/Concursos"
+    },
+    {
       "id": "praia_grande_concursos",
       "label": "Praia Grande — Concursos e Processos Seletivos",
       "city": "Praia Grande",
@@ -29,6 +35,12 @@
       "label": "Cubatão — Concursos Públicos",
       "city": "Cubatão",
       "url": "https://www.cubatao.sp.gov.br/concursopublico/"
+    },
+    {
+      "id": "guaruja_concursos",
+      "label": "Guarujá — Concursos Públicos",
+      "city": "Guarujá",
+      "url": "https://www.guaruja.sp.gov.br/concursos-publicos"
     }
   ],
   "include_terms": [
@@ -65,5 +77,5 @@
     "heteroidentificação",
     "heteroidentificacao"
   ],
-  "max_items": 60
+  "max_items": 80
 }
