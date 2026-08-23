@@ -14,14 +14,13 @@ on:
       - "monitor.py"
       - "monitor_runner.py"
       - "smtp_alert.py"
+      - "new_contests.py"
       - "config/**"
       - "requirements.txt"
       - ".github/workflows/monitor.yml"
   schedule:
     - cron: "7,22,37,52 * * * *"
 
-# GitHub também funciona como barramento de eventos para o APK: cada alerta
-# relevante pode virar uma Issue com label watch-alert, consumida pelo app.
 permissions:
   contents: write
   issues: write
@@ -33,7 +32,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,9 +48,9 @@ jobs:
       - name: Autoteste local do parser e transport wrapper
         run: |
           python monitor.py --self-test
-          python -m py_compile monitor_runner.py smtp_alert.py
+          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py
 
-      - name: Verificar fontes oficiais e watchdog Cloudflare
+      - name: Verificar acompanhamentos prioritários
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -73,16 +72,29 @@ jobs:
           ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
         run: python monitor_runner.py
 
-      - name: Persistir estado apenas quando mudou
+      - name: Descobrir concursos e processos seletivos novos
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
+        run: python new_contests.py
+
+      - name: Persistir estados apenas quando mudaram
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- state/github.json; then
-            exit 0
-          fi
           git config user.name "concursos-watch[bot]"
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
-          git add state/github.json
+          changed=0
+          for file in state/github.json state/new_contests.json; do
+            if [[ -f "$file" ]] && ! git diff --quiet -- "$file"; then
+              git add "$file"
+              changed=1
+            fi
+          done
+          if [[ "$changed" == "0" ]]; then
+            exit 0
+          fi
           git commit -m "chore(watch): update monitor state"
           git pull --rebase origin main
           git push origin HEAD:main
