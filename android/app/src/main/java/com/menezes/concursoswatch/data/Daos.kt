@@ -6,8 +6,8 @@ import androidx.room.Upsert
 
 @Dao
 interface ContestDao {
-    @Query("SELECT * FROM contests WHERE active = 1 ORDER BY unread DESC, priority DESC, firstSeen DESC")
-    suspend fun active(): List<ContestEntity>
+    @Query("SELECT * FROM contests WHERE active = 1 OR favorite = 1 ORDER BY unread DESC, priority DESC, first_seen DESC")
+    suspend fun visible(): List<ContestEntity>
 
     @Query("SELECT * FROM contests WHERE id = :id LIMIT 1")
     suspend fun byId(id: String): ContestEntity?
@@ -15,11 +15,8 @@ interface ContestDao {
     @Upsert
     suspend fun upsert(items: List<ContestEntity>)
 
-    @Query("UPDATE contests SET active = 0 WHERE syncGeneration < :generation AND favorite = 0")
+    @Query("UPDATE contests SET active = 0 WHERE sync_generation < :generation")
     suspend fun archiveMissing(generation: Long)
-
-    @Query("UPDATE contests SET active = 0 WHERE syncGeneration < :generation AND favorite = 1")
-    suspend fun archiveMissingFavorites(generation: Long)
 
     @Query("UPDATE contests SET favorite = :favorite WHERE id = :id")
     suspend fun setFavorite(id: String, favorite: Boolean)
@@ -33,7 +30,7 @@ interface ContestDao {
 
 @Dao
 interface AlertDao {
-    @Query("SELECT * FROM alerts ORDER BY unread DESC, createdAt DESC, id DESC")
+    @Query("SELECT * FROM alerts ORDER BY unread DESC, created_at DESC, id DESC")
     suspend fun all(): List<AlertEntity>
 
     @Query("SELECT * FROM alerts WHERE id = :id LIMIT 1")
@@ -51,7 +48,7 @@ interface AlertDao {
 
 @Dao
 interface SourceHealthDao {
-    @Query("SELECT * FROM source_health ORDER BY semanticOk ASC, label ASC")
+    @Query("SELECT * FROM source_health ORDER BY semantic_ok ASC, label ASC")
     suspend fun all(): List<SourceHealthEntity>
 
     @Upsert
