@@ -43,7 +43,7 @@ def save(path: Path, obj) -> None:
 
 def fetch(url: str) -> requests.Response:
     headers = {
-        "User-Agent": "ConcursosWatch-NewContests/1.0",
+        "User-Agent": "ConcursosWatch-NewContests/1.1",
         "Accept-Language": "pt-BR,pt;q=0.9",
         "Cache-Control": "no-cache",
     }
@@ -74,10 +74,8 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
             continue
         if any(fold(term) in combined for term in exclude_terms):
             continue
-        # Prefer links on the same official host. External official bank links may
-        # still appear, but generic social/share links are ignored.
         host = (parsed.hostname or "").casefold()
-        if host != source_host and not any(x in host for x in ("ibam", "vunesp", "ciee", "gov.br")):
+        if host != source_host and not any(x in host for x in ("ibam", "vunesp", "ciee", "gov.br", "fgv", "fundatec", "cebraspe")):
             continue
         if href in seen:
             continue
@@ -86,6 +84,9 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
             "source_id": source["id"],
             "source": source["label"],
             "city": source.get("city", ""),
+            "region": source.get("region", ""),
+            "scope": source.get("scope", ""),
+            "priority": int(source.get("priority", 50)),
             "title": title[:240] or parent[:240] or "Novo edital/processo seletivo",
             "url": href,
         })
@@ -119,11 +120,13 @@ def create_issue(repo: str, token: str, item: dict) -> None:
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+    tags = " • ".join(x for x in [item.get("scope", "").upper(), item.get("region", "")] if x)
     title = f"[NOVO CONCURSO] {item['source']} — {item['title']}"[:250]
     body = (
         "Novo concurso/processo seletivo detectado em fonte oficial.\n\n"
         f"Órgão/fonte: {item['source']}\n"
         f"Localidade: {item.get('city') or 'não informada'}\n"
+        f"Abrangência: {tags or 'não classificada'}\n"
         f"Título detectado: {item['title']}\n\n"
         f"Fonte oficial: {item['url']}\n\n"
         "_Detecção automática. Confirme requisitos e prazo no edital antes de agir._"
@@ -167,14 +170,18 @@ def main() -> int:
 
     new_items = [found[url] for url in found.keys() - old_seen]
     max_items = int(cfg.get("max_items") or 60)
-    items = sorted(merged.values(), key=lambda x: x.get("first_seen", ""), reverse=True)[:max_items]
+    items = sorted(
+        merged.values(),
+        key=lambda x: (int(x.get("priority", 50)), x.get("first_seen", "")),
+        reverse=True,
+    )[:max_items]
     seen_urls = list(dict.fromkeys(list(old_seen) + list(found.keys())))
 
     state = {
         "updated_at": stamp,
         "first_run_baseline": first_run,
         "items": items,
-        "seen_urls": seen_urls[-1000:],
+        "seen_urls": seen_urls[-3000:],
         "failures": failures,
     }
     save(STATE, state)
@@ -183,7 +190,7 @@ def main() -> int:
     token = os.getenv("GITHUB_TOKEN", "")
     if new_items and not first_run and repo and token:
         ensure_label(repo, token, "new-contest", "1f6feb", "Novo concurso/processo seletivo detectado em fonte oficial")
-        for item in new_items[:12]:
+        for item in sorted(new_items, key=lambda x: int(x.get("priority", 50)), reverse=True)[:20]:
             try:
                 create_issue(repo, token, item)
                 print(f"[NEW] issue criada: {item['title']}")
