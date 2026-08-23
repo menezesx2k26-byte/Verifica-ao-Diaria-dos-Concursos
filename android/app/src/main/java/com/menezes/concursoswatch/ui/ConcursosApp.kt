@@ -32,9 +32,9 @@ import com.menezes.concursoswatch.model.AlertItem
 import com.menezes.concursoswatch.model.Contest
 import com.menezes.concursoswatch.model.RegionFilter
 import com.menezes.concursoswatch.model.StatusFilter
-import com.menezes.concursoswatch.model.UserSettings
 
 private data class NavItem(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private const val RELEASES_URL = "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases"
 
 @Composable
 fun ConcursosApp(vm: AppViewModel = viewModel()) {
@@ -56,22 +56,31 @@ fun ConcursosApp(vm: AppViewModel = viewModel()) {
                     tabs.forEach { item ->
                         NavigationBarItem(
                             selected = route == item.route,
-                            onClick = { if (route != item.route) nav.navigate(item.route) { launchSingleTop = true; popUpTo("home") { saveState = true }; restoreState = true } },
+                            onClick = {
+                                if (route != item.route) nav.navigate(item.route) {
+                                    launchSingleTop = true
+                                    popUpTo("home") { saveState = true }
+                                    restoreState = true
+                                }
+                            },
                             icon = { Icon(item.icon, contentDescription = item.label) },
                             label = { Text(item.label, maxLines = 1, fontSize = 11.sp) },
-                            colors = NavigationBarItemDefaults.colors(selectedIconColor = AppPurple, selectedTextColor = AppPurple, indicatorColor = Color(0xFF241638), unselectedIconColor = AppMuted, unselectedTextColor = AppMuted)
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = AppPurple, selectedTextColor = AppPurple,
+                                indicatorColor = Color(0xFF241638), unselectedIconColor = AppMuted, unselectedTextColor = AppMuted
+                            )
                         )
                     }
                 }
             }
         ) { padding ->
             NavHost(navController = nav, startDestination = "home", modifier = Modifier.padding(padding)) {
-                composable("home") { HomeScreen(vm, onOpenContests = { nav.navigate("contests") }, onOpenAlerts = { nav.navigate("alerts") }, onDetail = { vm.selectContest(it); nav.navigate("detail") }) }
+                composable("home") { HomeScreen(vm, { nav.navigate("contests") }, { nav.navigate("alerts") }) { vm.selectContest(it); nav.navigate("detail") } }
                 composable("alerts") { AlertsScreen(vm) }
                 composable("contests") { ContestsScreen(vm, false) { vm.selectContest(it); nav.navigate("detail") } }
                 composable("favorites") { ContestsScreen(vm, true) { vm.selectContest(it); nav.navigate("detail") } }
                 composable("settings") { SettingsScreen(vm) }
-                composable("detail") { DetailScreen(vm, onBack = { nav.popBackStack() }) }
+                composable("detail") { DetailScreen(vm) { nav.popBackStack() } }
             }
         }
     }
@@ -118,9 +127,7 @@ private fun HomeScreen(vm: AppViewModel, onOpenContests: () -> Unit, onOpenAlert
         item { SectionTitle("Inscrições abertas", "Oportunidades estruturadas detectadas nas fontes oficiais") }
         if (openContests.isEmpty()) item { EmptyCard("Nenhuma inscrição aberta foi estruturada no feed ainda.") }
         else items(openContests.take(5), key = { it.id }) { ContestCard(it, vm::toggleFavorite, onDetail) }
-        item {
-            TextButton(onClick = onOpenContests, modifier = Modifier.padding(horizontal = 12.dp)) { Text("Ver todos os concursos") }
-        }
+        item { TextButton(onClick = onOpenContests, modifier = Modifier.padding(horizontal = 12.dp)) { Text("Ver todos os concursos") } }
     }
 }
 
@@ -133,7 +140,7 @@ private fun SyncStrip(vm: AppViewModel) {
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(if (s.syncing) "Sincronizando…" else "Última sincronização: ${vm.relativeSync()}", fontWeight = FontWeight.SemiBold)
-                Text("Android agenda o ciclo em ~15 min; economia de bateria pode atrasar.", color = AppMuted, fontSize = 12.sp)
+                Text("Ciclo em segundo plano ~15 min; o Android pode atrasar por bateria/Doze.", color = AppMuted, fontSize = 12.sp)
             }
             Button(onClick = vm::syncNow, enabled = !s.syncing) { Text(if (s.syncing) "…" else "Agora") }
         }
@@ -163,7 +170,9 @@ private fun SectionTitle(title: String, subtitle: String) {
 private fun PartialSyncWarning(contestError: String?, alertError: String?) {
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2015))) {
         Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Warning, null, tint = Color(0xFFFFB74D)); Spacer(Modifier.width(8.dp)); Text("Sincronização parcial", fontWeight = FontWeight.Bold) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Warning, null, tint = Color(0xFFFFB74D)); Spacer(Modifier.width(8.dp)); Text("Sincronização parcial", fontWeight = FontWeight.Bold)
+            }
             contestError?.let { Text("Concursos: $it", color = AppMuted, fontSize = 12.sp) }
             alertError?.let { Text("Alertas: $it", color = AppMuted, fontSize = 12.sp) }
         }
@@ -175,9 +184,7 @@ private fun AlertsScreen(vm: AppViewModel) {
     val alerts = vm.state.alerts
     LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
-            ScreenHeader("Alertas", "Histórico real, com lidos e não lidos") {
-                TextButton(onClick = vm::markAllAlertsRead) { Text("Marcar lidos") }
-            }
+            ScreenHeader("Alertas", "Histórico real, com lidos e não lidos") { TextButton(onClick = vm::markAllAlertsRead) { Text("Marcar lidos") } }
         }
         if (alerts.isEmpty()) item { EmptyCard("Nenhum alerta importante armazenado.") }
         else items(alerts, key = { it.id }) { AlertCard(it) { vm.markAlertRead(it) } }
@@ -187,7 +194,11 @@ private fun AlertsScreen(vm: AppViewModel) {
 @Composable
 private fun AlertCard(a: AlertItem, markRead: () -> Unit) {
     val uri = LocalUriHandler.current
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable { markRead(); if (a.url.isNotBlank()) uri.openUri(a.url) }, colors = CardDefaults.cardColors(containerColor = if (a.unread) Color(0xFF20162E) else AppPanel), border = if (a.priority >= 100) BorderStroke(1.dp, AppPurple) else null) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable { markRead(); if (a.url.isNotBlank()) uri.openUri(a.url) },
+        colors = CardDefaults.cardColors(containerColor = if (a.unread) Color(0xFF20162E) else AppPanel),
+        border = if (a.priority >= 100) BorderStroke(1.dp, AppPurple) else null
+    ) {
         Column(Modifier.padding(15.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.NotificationsActive, null, tint = if (a.priority >= 100) AppPurple else AppMuted)
@@ -228,7 +239,7 @@ private fun ContestsScreen(vm: AppViewModel, favoritesOnly: Boolean, onDetail: (
 private fun RegionFilters(vm: AppViewModel) {
     val options = listOf(RegionFilter.ALL to "Todos", RegionFilter.FEDERAL to "Federal", RegionFilter.SC to "Santa Catarina", RegionFilter.SUL to "Sul", RegionFilter.BAIXADA to "SP · Baixada")
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { (value,label) -> FilterChip(selected = vm.state.regionFilter == value, onClick = { vm.setRegion(value) }, label = { Text(label) }) }
+        options.forEach { (value, label) -> FilterChip(selected = vm.state.regionFilter == value, onClick = { vm.setRegion(value) }, label = { Text(label) }) }
     }
 }
 
@@ -236,13 +247,17 @@ private fun RegionFilters(vm: AppViewModel) {
 private fun StatusFilters(vm: AppViewModel) {
     val options = listOf(StatusFilter.ALL to "Todos", StatusFilter.OPEN to "Inscrições abertas", StatusFilter.CLOSING_SOON to "Encerra em 7 dias", StatusFilter.NEW to "Novos")
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { (value,label) -> FilterChip(selected = vm.state.statusFilter == value, onClick = { vm.setStatus(value) }, label = { Text(label) }) }
+        options.forEach { (value, label) -> FilterChip(selected = vm.state.statusFilter == value, onClick = { vm.setStatus(value) }, label = { Text(label) }) }
     }
 }
 
 @Composable
 private fun ContestCard(c: Contest, toggleFavorite: (Contest) -> Unit, onDetail: (Contest) -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable { onDetail(c) }, colors = CardDefaults.cardColors(containerColor = if (c.unread) Color(0xFF1D152B) else AppPanel), border = if (c.unread) BorderStroke(1.dp, Color(0xFF5E3484)) else null, shape = RoundedCornerShape(16.dp)) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clickable { onDetail(c) },
+        colors = CardDefaults.cardColors(containerColor = if (c.unread) Color(0xFF1D152B) else AppPanel),
+        border = if (c.unread) BorderStroke(1.dp, Color(0xFF5E3484)) else null, shape = RoundedCornerShape(16.dp)
+    ) {
         Column(Modifier.padding(15.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
@@ -269,14 +284,16 @@ private fun ContestCard(c: Contest, toggleFavorite: (Contest) -> Unit, onDetail:
 
 @Composable
 private fun StatusPill(status: String) {
-    val (label,color) = when(status) {
+    val (label, color) = when (status) {
         "open" -> "ABERTO" to AppGreen
         "closing_soon" -> "ENCERRA LOGO" to Color(0xFFFFB74D)
         "closed" -> "ENCERRADO" to AppMuted
         "announced" -> "ANUNCIADO" to AppPurple
         else -> "DETECTADO" to AppPurple
     }
-    Surface(color = color.copy(alpha=.15f), shape = RoundedCornerShape(50)) { Text(label, color = color, fontWeight = FontWeight.Bold, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) }
+    Surface(color = color.copy(alpha = .15f), shape = RoundedCornerShape(50)) {
+        Text(label, color = color, fontWeight = FontWeight.Bold, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+    }
 }
 
 @Composable
@@ -294,19 +311,18 @@ private fun DetailScreen(vm: AppViewModel, onBack: () -> Unit) {
                 Text(c.title, fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
                 Text(c.organization.ifBlank { c.source }, color = AppPurple, fontSize = 16.sp)
                 Spacer(Modifier.height(18.dp))
-                DetailRow("Local", listOf(c.city,c.uf).filter { it.isNotBlank() }.joinToString(" · "))
-                DetailRow("Esfera", c.scope)
-                DetailRow("Tipo", c.type)
-                DetailRow("Escolaridade", c.education)
-                DetailRow("Área", c.area)
-                DetailRow("Remuneração", c.remuneration)
-                DetailRow("Vagas / CR", c.vacancies)
-                DetailRow("Taxa", c.fee)
-                DetailRow("Inscrições", listOf(c.startDate,c.endDate).filter { it.isNotBlank() }.joinToString(" → "))
+                DetailRow("Local", listOf(c.city, c.uf).filter { it.isNotBlank() }.joinToString(" · "))
+                DetailRow("Esfera", c.scope); DetailRow("Tipo", c.type); DetailRow("Escolaridade", c.education)
+                DetailRow("Área", c.area); DetailRow("Remuneração", c.remuneration); DetailRow("Vagas / CR", c.vacancies)
+                DetailRow("Taxa", c.fee); DetailRow("Inscrições", listOf(c.startDate, c.endDate).filter { it.isNotBlank() }.joinToString(" → "))
                 DetailRow("Fonte", c.source)
                 Spacer(Modifier.height(18.dp))
-                Button(onClick = { uri.openUri(c.editalUrl.ifBlank { c.url }) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Filled.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Abrir fonte oficial") }
-                OutlinedButton(onClick = { vm.toggleFavorite(c) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Icon(if(c.favorite) Icons.Filled.Star else Icons.Filled.StarBorder, null); Spacer(Modifier.width(8.dp)); Text(if(c.favorite) "Remover dos favoritos" else "Salvar nos favoritos") }
+                Button(onClick = { uri.openUri(c.editalUrl.ifBlank { c.url }) }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Abrir fonte oficial")
+                }
+                OutlinedButton(onClick = { vm.toggleFavorite(c) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Icon(if (c.favorite) Icons.Filled.Star else Icons.Filled.StarBorder, null); Spacer(Modifier.width(8.dp)); Text(if (c.favorite) "Remover dos favoritos" else "Salvar nos favoritos")
+                }
             }
         }
     }
@@ -322,26 +338,55 @@ private fun DetailRow(label: String, value: String) {
 @Composable
 private fun SettingsScreen(vm: AppViewModel) {
     val s = vm.state.settings
+    val uri = LocalUriHandler.current
+    var keywords by remember(s.priorityKeywords) { mutableStateOf(s.priorityKeywords) }
+    val installed = BuildConfig.VERSION_NAME.removeSuffix("-dev")
+    val latest = vm.state.latestRelease
+    val updateAvailable = !latest.isNullOrBlank() && latest != installed
     LazyColumn(contentPadding = PaddingValues(bottom = 30.dp)) {
         item {
-            ScreenHeader("Configurações", "Notificações, fontes e integridade")
+            ScreenHeader("Configurações", "Notificações, prioridades, fontes e integridade")
             SettingsCard("Notificar Federal", s.notifyFederal) { vm.saveSettings(s.copy(notifyFederal = it)) }
             SettingsCard("Notificar Santa Catarina", s.notifySantaCatarina) { vm.saveSettings(s.copy(notifySantaCatarina = it)) }
             SettingsCard("Notificar Região Sul", s.notifySul) { vm.saveSettings(s.copy(notifySul = it)) }
             SettingsCard("Notificar Baixada Santista", s.notifyBaixada) { vm.saveSettings(s.copy(notifyBaixada = it)) }
             SettingsCard("Só inscrições abertas", s.notifyOnlyOpen) { vm.saveSettings(s.copy(notifyOnlyOpen = it)) }
             SettingsCard("Só oportunidades aderentes/prioritárias", s.notifyOnlyRelevant) { vm.saveSettings(s.copy(notifyOnlyRelevant = it)) }
-            Spacer(Modifier.height(16.dp))
-            Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp), colors = CardDefaults.cardColors(containerColor = AppPanel)) {
+
+            Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = AppPanel)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Perfil de prioridade", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Separe por vírgulas. Essas palavras ajudam a decidir quais concursos novos merecem notificação.", color = AppMuted, fontSize = 12.sp)
+                    OutlinedTextField(value = keywords, onValueChange = { keywords = it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), minLines = 3, label = { Text("Palavras prioritárias") })
+                    Button(onClick = { vm.saveSettings(s.copy(priorityKeywords = keywords)) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Salvar perfil") }
+                }
+            }
+
+            Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = AppPanel)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("Saúde do monitor", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text("${vm.state.healthySources} de ${vm.state.sourceCount} fontes responderam na última coleta.", color = AppMuted)
                     vm.state.contestError?.let { Text("Feed de concursos: $it", color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
                     vm.state.alertError?.let { Text("Feed de alertas: $it", color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                    val failing = vm.state.sourceHealth.filterNot { it.ok }
+                    if (failing.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        Text("Fontes com falha", fontWeight = FontWeight.SemiBold)
+                        failing.take(12).forEach { source ->
+                            Text("• ${source.label}: ${source.error.ifBlank { "sem resposta" }}", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Versão instalada: ${BuildConfig.VERSION_NAME}", color = AppMuted)
-                    Text("Última release detectada: ${vm.state.latestRelease ?: "não verificada"}", color = AppMuted)
-                    Button(onClick = vm::syncNow, enabled = !vm.state.syncing, modifier = Modifier.fillMaxWidth().padding(top = 12.dp)) { Text("Verificar agora") }
+                    Text("Última release detectada: ${latest ?: "não verificada"}", color = AppMuted)
+                    if (updateAvailable) {
+                        Button(onClick = { uri.openUri(RELEASES_URL) }, modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+                            Icon(Icons.Filled.SystemUpdate, null); Spacer(Modifier.width(8.dp)); Text("Baixar atualização $latest")
+                        }
+                        Text("O Android exige sua confirmação para instalar APKs; o app não tenta contornar essa proteção.", color = AppMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+                    }
+                    OutlinedButton(onClick = { uri.openUri(RELEASES_URL) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Abrir releases") }
+                    Button(onClick = vm::syncNow, enabled = !vm.state.syncing, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) { Text("Verificar dados agora") }
                 }
             }
         }
@@ -352,8 +397,7 @@ private fun SettingsScreen(vm: AppViewModel) {
 private fun SettingsCard(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp), colors = CardDefaults.cardColors(containerColor = AppPanel)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, modifier = Modifier.weight(1f))
-            Switch(checked = checked, onCheckedChange = onChange)
+            Text(label, modifier = Modifier.weight(1f)); Switch(checked = checked, onCheckedChange = onChange)
         }
     }
 }
@@ -361,6 +405,8 @@ private fun SettingsCard(label: String, checked: Boolean, onChange: (Boolean) ->
 @Composable
 private fun EmptyCard(text: String) {
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), colors = CardDefaults.cardColors(containerColor = AppPanel), border = BorderStroke(1.dp, Color(0xFF2D2340))) {
-        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.Info, null, tint = AppMuted); Spacer(Modifier.width(10.dp)); Text(text, color = AppMuted) }
+        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Info, null, tint = AppMuted); Spacer(Modifier.width(10.dp)); Text(text, color = AppMuted)
+        }
     }
 }
