@@ -17,7 +17,9 @@ import com.menezes.concursoswatch.R
 import com.menezes.concursoswatch.data.ContestRepository
 import com.menezes.concursoswatch.data.SettingsStore
 import com.menezes.concursoswatch.model.Contest
+import com.menezes.concursoswatch.model.UserSettings
 import kotlinx.coroutines.flow.first
+import java.text.Normalizer
 
 class SyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
@@ -33,26 +35,28 @@ class SyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
             notify("important", a.id, a.title, a.body, a.url)
         }
 
-        return when {
-            result.contestsOk || result.alertsOk -> Result.success()
-            else -> Result.retry()
-        }
+        return if (result.contestsOk || result.alertsOk) Result.success() else Result.retry()
     }
 
-    private fun shouldNotify(c: Contest, s: com.menezes.concursoswatch.model.UserSettings): Boolean {
+    private fun shouldNotify(c: Contest, s: UserSettings): Boolean {
         if (s.notifyOnlyOpen && c.status !in listOf("open", "closing_soon")) return false
+        val city = normalized(c.city)
         val regionOk = when {
             c.scope.equals("federal", true) && s.notifyFederal -> true
             c.region.equals("SC", true) && s.notifySantaCatarina -> true
-            c.region.equals("Sul", true) && s.notifySul -> true
-            c.region.equals("PR", true) && s.notifySul -> true
-            c.region.equals("RS", true) && s.notifySul -> true
-            c.city.lowercase() in listOf("praia grande", "santos", "são vicente", "sao vicente", "cubatão", "cubatao", "guarujá", "guaruja") && s.notifyBaixada -> true
+            c.uf.equals("SC", true) && s.notifySantaCatarina -> true
+            (c.region.equals("Sul", true) || c.uf.uppercase() in setOf("SC", "PR", "RS")) && s.notifySul -> true
+            city in setOf("praia grande", "santos", "sao vicente", "cubatao", "guaruja") && s.notifyBaixada -> true
             else -> false
         }
         if (!regionOk) return false
         if (!s.notifyOnlyRelevant) return true
-        return c.priority >= 85 || c.area.lowercase() in listOf("matemática", "matematica", "mecatrônica", "mecatronica", "ti", "administrativo", "docência", "docencia") || c.education.lowercase().contains("médio") || c.education.lowercase().contains("medio")
+
+        val corpus = normalized(listOf(c.title, c.organization, c.city, c.area, c.education, c.type, c.source).joinToString(" "))
+        val keywords = s.priorityKeywords.split(',').map(::normalized).filter { it.length >= 2 }
+        val keywordMatch = keywords.any { it in corpus }
+        val defaultMatch = c.priority >= 85 || c.area.lowercase() in listOf("matemática", "matematica", "mecatrônica", "mecatronica", "ti", "administrativo", "docência", "docencia") || c.education.lowercase().contains("médio") || c.education.lowercase().contains("medio")
+        return keywordMatch || defaultMatch
     }
 
     private fun notifyContest(c: Contest) {
@@ -75,6 +79,8 @@ class SyncWorker(appContext: Context, params: WorkerParameters) : CoroutineWorke
             .build()
         (applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(id, notification)
     }
+
+    private fun normalized(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFD).replace(Regex("\\p{Mn}+"), "").lowercase().trim()
 }
 
 fun createChannels(context: Context) {
