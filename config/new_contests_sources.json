@@ -1,195 +1,38 @@
 {
   "sources": [
-    {
-      "id": "federal_mgi_concursos",
-      "label": "Governo Federal — Concursos e Provimento",
-      "city": "Brasil",
-      "region": "Brasil",
-      "scope": "federal",
-      "priority": 100,
-      "url": "https://www.gov.br/servidor/pt-br/acesso-a-informacao/gestao-de-pessoas/concursos-publicos-e-provimento-de-pessoal/concursos-publicos"
-    },
-    {
-      "id": "ifsp_concursos",
-      "label": "IFSP — Concursos Públicos",
-      "city": "São Paulo / campi",
-      "region": "SP",
-      "scope": "federal",
-      "priority": 95,
-      "url": "https://concurso.ifsp.edu.br/"
-    },
-    {
-      "id": "tjsp_concursos",
-      "label": "TJSP — Concursos",
-      "city": "Estado de São Paulo",
-      "region": "SP",
-      "scope": "estadual",
-      "priority": 100,
-      "url": "https://www.tjsp.jus.br/Concursos"
-    },
-    {
-      "id": "praia_grande_concursos",
-      "label": "Praia Grande — Concursos e Processos Seletivos",
-      "city": "Praia Grande",
-      "region": "SP",
-      "scope": "municipal",
-      "priority": 100,
-      "url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187"
-    },
-    {
-      "id": "sao_vicente_concursos",
-      "label": "São Vicente — Concursos",
-      "city": "São Vicente",
-      "region": "SP",
-      "scope": "municipal",
-      "priority": 100,
-      "url": "https://www.saovicente.sp.gov.br/institucional/concursos"
-    },
-    {
-      "id": "santos_concursos",
-      "label": "Santos — Concursos",
-      "city": "Santos",
-      "region": "SP",
-      "scope": "municipal",
-      "priority": 95,
-      "url": "https://www.santos.sp.gov.br/?q=busca/concurso"
-    },
-    {
-      "id": "cubatao_concursos",
-      "label": "Cubatão — Concursos Públicos",
-      "city": "Cubatão",
-      "region": "SP",
-      "scope": "municipal",
-      "priority": 95,
-      "url": "https://www.cubatao.sp.gov.br/concursopublico/"
-    },
-    {
-      "id": "guaruja_concursos",
-      "label": "Guarujá — Concursos Públicos",
-      "city": "Guarujá",
-      "region": "SP",
-      "scope": "municipal",
-      "priority": 90,
-      "url": "https://www.guaruja.sp.gov.br/concursos-publicos"
-    },
-    {
-      "id": "ifsc_certames",
-      "label": "IFSC — Concursos e Processos Seletivos",
-      "city": "Santa Catarina / campi",
-      "region": "SC",
-      "scope": "federal",
-      "priority": 100,
-      "url": "https://certame.ifsc.edu.br/sigcertame/public/candidato/index.jsf"
-    },
-    {
-      "id": "ufsc_concursos",
-      "label": "UFSC — Concursos e Seleções",
-      "city": "Florianópolis / Araranguá / Curitibanos / Joinville / Blumenau",
-      "region": "SC",
-      "scope": "federal",
-      "priority": 100,
-      "url": "https://concursos.ufsc.br/"
-    },
-    {
-      "id": "udesc_concursos",
-      "label": "UDESC — Concursos e Processos Seletivos",
-      "city": "Santa Catarina",
-      "region": "SC",
-      "scope": "estadual",
-      "priority": 100,
-      "url": "https://www.udesc.br/concursospublicos"
-    },
-    {
-      "id": "udesc_ceplan_sbs",
-      "label": "UDESC CEPLAN — São Bento do Sul",
-      "city": "São Bento do Sul",
-      "region": "SC",
-      "scope": "estadual",
-      "priority": 100,
-      "url": "https://www.udesc.br/ceplan/concursos"
-    },
-    {
-      "id": "tjsc_concursos",
-      "label": "TJSC — Concursos e Estágio",
-      "city": "Santa Catarina",
-      "region": "SC",
-      "scope": "estadual",
-      "priority": 100,
-      "url": "https://www.tjsc.jus.br/web/concursos"
-    },
-    {
-      "id": "ifrs_concursos",
-      "label": "IFRS — Concursos",
-      "city": "Rio Grande do Sul / campi",
-      "region": "RS",
-      "scope": "federal",
-      "priority": 90,
-      "url": "https://ifrs.edu.br/concursos/"
-    },
-    {
-      "id": "ifrs_editais",
-      "label": "IFRS — Editais e Processos Seletivos",
-      "city": "Rio Grande do Sul / campi",
-      "region": "RS",
-      "scope": "federal",
-      "priority": 90,
-      "url": "https://ifrs.edu.br/editais/"
-    },
-    {
-      "id": "ufpr_docentes",
-      "label": "UFPR — Concursos Docentes e Testes Seletivos",
-      "city": "Paraná / campi",
-      "region": "PR",
-      "scope": "federal",
-      "priority": 85,
-      "url": "https://progepe.ufpr.br/a/concursos/docente/concursos_publicos/concursos.html"
-    }
+    {"id":"federal_mgi_concursos","label":"Governo Federal — Concursos e Provimento","city":"Brasil","region":"Brasil","scope":"federal","priority":100,"url":"https://www.gov.br/servidor/pt-br/acesso-a-informacao/gestao-de-pessoas/concursos-publicos-e-provimento-de-pessoal/concursos-publicos"},
+    {"id":"ifsp_concursos","label":"IFSP — Concursos Públicos","city":"São Paulo / campi","region":"SP","scope":"federal","priority":95,"url":"https://concurso.ifsp.edu.br/"},
+    {"id":"tjsp_concursos","label":"TJSP — Concursos","city":"Estado de São Paulo","region":"SP","scope":"estadual","priority":100,"url":"https://www.tjsp.jus.br/Concursos"},
+    {"id":"praia_grande_concursos","label":"Praia Grande — Concursos e Processos Seletivos","city":"Praia Grande","region":"SP","scope":"municipal","priority":100,"url":"https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187"},
+    {"id":"sao_vicente_concursos","label":"São Vicente — Concursos","city":"São Vicente","region":"SP","scope":"municipal","priority":100,"url":"https://www.saovicente.sp.gov.br/institucional/concursos"},
+    {"id":"santos_concursos","label":"Santos — Concursos","city":"Santos","region":"SP","scope":"municipal","priority":95,"url":"https://www.santos.sp.gov.br/?q=busca/concurso"},
+    {"id":"cubatao_concursos","label":"Cubatão — Concursos Públicos","city":"Cubatão","region":"SP","scope":"municipal","priority":95,"url":"https://www.cubatao.sp.gov.br/concursopublico/"},
+    {"id":"guaruja_concursos","label":"Guarujá — Concursos Públicos","city":"Guarujá","region":"SP","scope":"municipal","priority":90,"url":"https://www.guaruja.sp.gov.br/concursos-publicos"},
+
+    {"id":"ifsc_certames","label":"IFSC — Concursos e Processos Seletivos","city":"Santa Catarina / campi","region":"SC","scope":"federal","priority":100,"url":"https://certame.ifsc.edu.br/"},
+    {"id":"ufsc_concursos","label":"UFSC — Concursos e Seleções","city":"Florianópolis / Araranguá / Curitibanos / Joinville / Blumenau","region":"SC","scope":"federal","priority":100,"url":"https://concursos.ufsc.br/"},
+    {"id":"udesc_concursos","label":"UDESC — Concursos e Processos Seletivos","city":"Santa Catarina","region":"SC","scope":"estadual","priority":100,"url":"https://www.udesc.br/concursospublicos"},
+    {"id":"udesc_ceplan_sbs","label":"UDESC CEPLAN — São Bento do Sul","city":"São Bento do Sul","region":"SC","scope":"estadual","priority":100,"url":"https://www.udesc.br/ceplan/concursos"},
+    {"id":"tjsc_concursos","label":"TJSC — Concursos de Servidores e Estágio","city":"Santa Catarina","region":"SC","scope":"estadual","priority":100,"url":"https://www.tjsc.jus.br/web/concursos/servidor"},
+    {"id":"mpsc_oportunidades","label":"MPSC — Concursos, Estágios e Residência","city":"Santa Catarina","region":"SC","scope":"estadual","priority":100,"url":"https://www.mpsc.mp.br/faca-parte-do-mpsc"},
+    {"id":"tcesc_concursos","label":"TCE/SC — Concursos","city":"Santa Catarina","region":"SC","scope":"estadual","priority":100,"url":"https://www.tcesc.tc.br/content/concursos"},
+    {"id":"alesc_concursos","label":"ALESC — Concursos Públicos","city":"Florianópolis / Santa Catarina","region":"SC","scope":"estadual","priority":95,"url":"https://transparencia.alesc.sc.gov.br/"},
+    {"id":"joinville_concursos","label":"Joinville — Concursos Públicos","city":"Joinville","region":"SC","scope":"municipal","priority":95,"url":"https://www.joinville.sc.gov.br/assunto/administracao-e-governo/concursos-publicos/"},
+    {"id":"joinville_pss","label":"Joinville — Processos Seletivos Simplificados","city":"Joinville","region":"SC","scope":"municipal","priority":95,"url":"https://www.joinville.sc.gov.br/servicos/consultar-processos-seletivos-simplificados/"},
+    {"id":"dom_sc","label":"DOM/SC — Concursos dos Municípios Catarinenses","city":"Municípios de Santa Catarina","region":"SC","scope":"municipal","priority":90,"url":"https://static.dom.sc.gov.br/?q=categoria%3AConcursos&r=site%2Findex"},
+
+    {"id":"ifrs_concursos","label":"IFRS — Concursos","city":"Rio Grande do Sul / campi","region":"RS","scope":"federal","priority":90,"url":"https://ifrs.edu.br/concursos/"},
+    {"id":"ifrs_editais","label":"IFRS — Editais e Processos Seletivos","city":"Rio Grande do Sul / campi","region":"RS","scope":"federal","priority":90,"url":"https://ifrs.edu.br/editais/"},
+    {"id":"ufpr_docentes","label":"UFPR — Concursos Docentes e Testes Seletivos","city":"Paraná / campi","region":"PR","scope":"federal","priority":85,"url":"https://progepe.ufpr.br/a/concursos/docente/concursos_publicos/concursos.html"},
+    {"id":"trf4_servidores","label":"TRF4/JF4 — Concurso de Servidores","city":"Paraná / Santa Catarina / Rio Grande do Sul","region":"Sul","scope":"federal","priority":95,"url":"https://www.trf4.jus.br/trf4/controlador.php?acao=pagina_visualizar&id_pagina=2045"},
+    {"id":"trt9_servidores","label":"TRT-9 — Concurso de Servidores","city":"Paraná","region":"PR","scope":"federal","priority":85,"url":"https://www.trt9.jus.br/portal/pagina.xhtml?pagina=CONCURSO_SERVIDOR_2022&secao=12"}
   ],
   "include_terms": [
-    "concurso público",
-    "concurso publico",
-    "processo seletivo",
-    "processo simplificado",
-    "processo seletivo simplificado",
-    "professor substituto",
-    "professor temporário",
-    "professor temporario",
-    "técnico-administrativo",
-    "tecnico-administrativo",
-    "técnico administrativo",
-    "tecnico administrativo",
-    "seleção de estagiários",
-    "selecao de estagiarios",
-    "estágio",
-    "estagio",
-    "inscrições abertas",
-    "inscricoes abertas",
-    "edital de abertura",
-    "abertura de inscrições",
-    "abertura de inscricoes",
-    "edital"
+    "concurso público","concurso publico","processo seletivo","processo simplificado","processo seletivo simplificado","professor substituto","professor temporário","professor temporario","técnico-administrativo","tecnico-administrativo","técnico administrativo","tecnico administrativo","seleção de estagiários","selecao de estagiarios","estágio","estagio","residência","residencia","inscrições abertas","inscricoes abertas","edital de abertura","abertura de inscrições","abertura de inscricoes","novo edital","edital"
   ],
   "exclude_terms": [
-    "convocação",
-    "convocacao",
-    "nomeação",
-    "nomeacao",
-    "posse",
-    "resultado",
-    "classificação",
-    "classificacao",
-    "homologação",
-    "homologacao",
-    "desclassificação",
-    "desclassificacao",
-    "gabarito",
-    "recurso",
-    "isenção",
-    "isencao",
-    "prova física",
-    "prova fisica",
-    "heteroidentificação",
-    "heteroidentificacao"
+    "convocação","convocacao","nomeação","nomeacao","posse","resultado","classificação","classificacao","homologação","homologacao","desclassificação","desclassificacao","gabarito","recurso","isenção","isencao","prova física","prova fisica","heteroidentificação","heteroidentificacao","resultado preliminar","resultado definitivo","local de prova","lista de inscritos"
   ],
-  "max_items": 200
+  "max_items": 250,
+  "max_seen_urls": 5000
 }
