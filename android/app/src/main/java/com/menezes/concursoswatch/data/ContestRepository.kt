@@ -40,12 +40,7 @@ class ContestRepository(context: Context) {
             val incoming = feed.items.map { item ->
                 val old = existing[item.id]
                 if (old == null && !contestBaseline) newContestIds += item.id
-                item.toEntity(
-                    favorite = old?.favorite ?: false,
-                    unread = old?.unread ?: (!contestBaseline),
-                    active = true,
-                    generation = generation,
-                )
+                item.toEntity(old?.favorite ?: false, old?.unread ?: (!contestBaseline), true, generation)
             }
             db.withTransaction {
                 db.contestDao().upsert(incoming)
@@ -68,7 +63,7 @@ class ContestRepository(context: Context) {
             val incoming = remoteAlerts.map { item ->
                 val old = existing[item.id]
                 if (old == null && !alertBaseline) newAlertIds += item.id
-                item.toEntity(unread = old?.unread ?: (!alertBaseline))
+                item.toEntity(old?.unread ?: (!alertBaseline))
             }
             db.withTransaction {
                 db.alertDao().upsert(incoming)
@@ -112,8 +107,8 @@ private fun AlertEntity.toModel() = AlertItem(id, title, body, url, createdAt, p
 private fun AlertItem.toEntity(unread: Boolean) = AlertEntity(id, title, body, url, createdAt, priority, unread)
 
 private fun SourceHealthEntity.toModel() = SourceHealth(
-    id, label, httpOk, parserOk, semanticOk, itemCount, expectedMin, checkedAt, lastSuccessAt, fingerprint, error,
+    id, label, httpOk, parserOk, semanticOk, itemCount, expectedMin, checkedAt, lastSuccessAt, fingerprint, scanStatus, error,
 )
 private fun SourceHealth.toEntity() = SourceHealthEntity(
-    id, label, httpOk, parserOk, semanticOk, itemCount, expectedMin, checkedAt, lastSuccessAt, fingerprint, error,
+    id, label, httpOk, parserOk, semanticOk, itemCount, expectedMin, checkedAt, lastSuccessAt, fingerprint, scanStatus, error,
 )
