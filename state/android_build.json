@@ -1,9 +1,11 @@
 {
+  "version": "2.0.0",
   "build_outcome": "cancelled",
-  "publish_outcome": "skipped",
-  "run_id": "32671811102",
+  "production_signing_configured": false,
+  "run_id": "32671945305",
   "run_attempt": "1",
-  "sha": "462b68fad9bc090552bba025a4bd9350b7970c6a",
-  "release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v1.3.0",
-  "build_log_tail": "Starting a Gradle Daemon (subsequent builds will be faster)\n> Task :app:preBuild UP-TO-DATE\n> Task :app:preDebugBuild UP-TO-DATE\n> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE\n> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :app:generateDebugBuildConfig\n> Task :app:generateDebugResValues\n> Task :app:checkDebugAarMetadata\n> Task :app:mapDebugSourceSetPaths\n> Task :app:generateDebugResources\n> Task :app:packageDebugResources\n> Task :app:mergeDebugResources\n> Task :app:createDebugCompatibleScreenManifests\n> Task :app:extractDeepLinksDebug\n> Task :app:parseDebugLocalResources\n> Task :app:processDebugMainManifest\n> Task :app:processDebugManifest\n> Task :app:javaPreCompileDebug\n> Task :app:mergeDebugShaders\n> Task :app:compileDebugShaders NO-SOURCE\n> Task :app:generateDebugAssets UP-TO-DATE\n> Task :app:mergeDebugAssets\n> Task :app:compressDebugAssets\n> Task :app:desugarDebugFileDependencies\n> Task :app:mergeDebugJniLibFolders\n> Task :app:checkDebugDuplicateClasses\n> Task :app:mergeDebugNativeLibs"
+  "sha": "80f80e8425cc9a57596425d7a0335c932a783bc5",
+  "dev_release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v2.0.0-dev",
+  "production_release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v2.0.0",
+  "build_log_tail": "Starting a Gradle Daemon (subsequent builds will be faster)\n> Task :app:preBuild UP-TO-DATE\n> Task :app:preDebugBuild UP-TO-DATE\n> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE\n> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :app:generateDebugBuildConfig\n> Task :app:generateDebugResValues\n> Task :app:checkDebugAarMetadata\n> Task :app:mapDebugSourceSetPaths\n> Task :app:generateDebugResources\n> Task :app:packageDebugResources\n> Task :app:mergeDebugResources\n> Task :app:createDebugCompatibleScreenManifests\n> Task :app:extractDeepLinksDebug\n> Task :app:parseDebugLocalResources\n> Task :app:processDebugMainManifest\n> Task :app:processDebugManifest\n> Task :app:javaPreCompileDebug\n> Task :app:mergeDebugShaders\n> Task :app:compileDebugShaders NO-SOURCE\n> Task :app:generateDebugAssets UP-TO-DATE\n> Task :app:mergeDebugAssets\n> Task :app:compressDebugAssets\n> Task :app:desugarDebugFileDependencies\n> Task :app:mergeDebugJniLibFolders\n> Task :app:checkDebugDuplicateClasses\n> Task :app:processDebugManifestForPackage\n> Task :app:mergeDebugNativeLibs\n> Task :app:processDebugResources\n> Task :app:mergeExtDexDebug"
 }
