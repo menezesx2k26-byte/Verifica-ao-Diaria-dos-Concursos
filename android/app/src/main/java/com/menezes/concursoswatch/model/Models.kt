@@ -49,6 +49,7 @@ data class SourceHealth(
     val checkedAt: String,
     val lastSuccessAt: String,
     val fingerprint: String,
+    val scanStatus: String,
     val error: String,
 ) {
     val ok: Boolean get() = httpOk && parserOk && semanticOk
