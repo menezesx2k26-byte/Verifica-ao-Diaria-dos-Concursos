@@ -49,11 +49,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if gh release view android-v1.1.0 >/dev/null 2>&1; then
-            gh release upload android-v1.1.0 ConcursosWatch.apk --clobber
+          if gh release view android-v1.2.0 >/dev/null 2>&1; then
+            gh release upload android-v1.2.0 ConcursosWatch.apk --clobber
           else
-            gh release create android-v1.1.0 ConcursosWatch.apk \
+            gh release create android-v1.2.0 ConcursosWatch.apk \
               --target "$GITHUB_SHA" \
-              --title "Concursos Watch Android v1.1.0" \
-              --notes "APK com alertas filtrados e seção separada de concursos novos detectados em fontes oficiais."
+              --title "Concursos Watch Android v1.2.0" \
+              --notes "APK conectado ao monitor GitHub Actions, com alertas filtrados e feed ampliado de concursos novos em fontes oficiais, incluindo federal e Sul com prioridade para Santa Catarina."
           fi
