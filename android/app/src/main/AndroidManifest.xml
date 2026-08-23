@@ -4,7 +4,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:usesCleartextTraffic="false"
+        android:icon="@drawable/ic_launcher"
         android:label="Concursos Watch"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
