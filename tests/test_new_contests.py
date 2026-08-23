@@ -1,6 +1,5 @@
 import unittest
 from datetime import date
-from unittest.mock import patch
 
 import new_contests as nc
 
@@ -31,6 +30,13 @@ class NewContestsParserTests(unittest.TestCase):
         tomorrow = date.fromordinal(date.today().toordinal() + 1).isoformat()
         self.assertEqual(nc.classify("edital", yesterday)["status"], "closed")
         self.assertEqual(nc.classify("edital", tomorrow)["status"], "closing_soon")
+
+    def test_historical_archive_entry_is_stale(self):
+        self.assertTrue(nc.is_stale_candidate("Edital 141/07", "Edital antigo", "https://tjsc.jus.br/edital-141-2007", "detected", ""))
+
+    def test_current_open_entry_is_not_stale(self):
+        year = date.today().year
+        self.assertFalse(nc.is_stale_candidate(f"Edital 10/{str(year)[-2:]}", "inscrições abertas", f"https://org.gov.br/edital-{year}", "open", ""))
 
 
 if __name__ == "__main__":
