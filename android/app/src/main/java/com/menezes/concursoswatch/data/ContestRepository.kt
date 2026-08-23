@@ -1,26 +1,29 @@
 package com.menezes.concursoswatch.data
 
 import android.content.Context
+import androidx.room.withTransaction
 import com.menezes.concursoswatch.model.AlertItem
 import com.menezes.concursoswatch.model.Contest
 import com.menezes.concursoswatch.model.SourceHealth
 import com.menezes.concursoswatch.model.SyncResult
 
 class ContestRepository(context: Context) {
-    private val db = AppDatabase(context.applicationContext)
+    private val db = AppDatabase.get(context.applicationContext)
     private val remote = RemoteDataSource()
 
-    fun contests(): List<Contest> = db.contests()
-    fun alerts(): List<AlertItem> = db.alerts()
-    fun sourceHealthJson(): String = db.meta("source_health") ?: "[]"
-    fun lastSync(): Long = db.meta("last_sync")?.toLongOrNull() ?: 0L
-    fun lastContestError(): String? = db.meta("contest_error")?.takeIf { it.isNotBlank() }
-    fun lastAlertError(): String? = db.meta("alert_error")?.takeIf { it.isNotBlank() }
-    fun latestKnownRelease(): String? = db.meta("latest_release")
+    suspend fun contests(): List<Contest> = db.contestDao().visible().map { it.toModel() }
+    suspend fun contest(id: String): Contest? = db.contestDao().byId(id)?.toModel()
+    suspend fun alerts(): List<AlertItem> = db.alertDao().all().map { it.toModel() }
+    suspend fun sourceHealth(): List<SourceHealth> = db.sourceHealthDao().all().map { it.toModel() }
+    suspend fun lastSync(): Long = meta("last_sync")?.toLongOrNull() ?: 0L
+    suspend fun lastContestError(): String? = meta("contest_error")?.takeIf { it.isNotBlank() }
+    suspend fun lastAlertError(): String? = meta("alert_error")?.takeIf { it.isNotBlank() }
+    suspend fun latestKnownRelease(): String? = meta("latest_release")
+    suspend fun sourceCount(): Int = meta("source_count")?.toIntOrNull() ?: 0
 
-    fun syncAll(): SyncResult {
-        val contestBaseline = db.meta("contest_baseline") == null
-        val alertBaseline = db.meta("alert_baseline") == null
+    suspend fun syncAll(): SyncResult {
+        val contestBaseline = meta("contest_baseline") == null
+        val alertBaseline = meta("alert_baseline") == null
         val newContestIds = mutableListOf<String>()
         val newAlertIds = mutableListOf<Int>()
         var contestsOk = false
@@ -32,56 +35,85 @@ class ContestRepository(context: Context) {
         try {
             val feed = remote.fetchContestFeed()
             health = feed.health
-            for (item in feed.items) {
-                val inserted = db.upsertContest(item, unreadIfNew = !contestBaseline)
-                if (inserted && !contestBaseline) newContestIds += item.id
+            val generation = System.currentTimeMillis()
+            val existing = db.contestDao().visible().associateBy { it.id }
+            val incoming = feed.items.map { item ->
+                val old = existing[item.id]
+                if (old == null && !contestBaseline) newContestIds += item.id
+                item.toEntity(
+                    favorite = old?.favorite ?: false,
+                    unread = old?.unread ?: (!contestBaseline),
+                    active = true,
+                    generation = generation,
+                )
             }
-            db.setMeta("contest_baseline", "1")
-            db.setMeta("contest_error", "")
-            db.setMeta("source_health", sourceHealthToJson(feed.health))
-            db.setMeta("source_count", feed.sourceCount.toString())
-            db.setMeta("feed_updated_at", feed.updatedAt)
+            db.withTransaction {
+                db.contestDao().upsert(incoming)
+                db.contestDao().archiveMissing(generation)
+                db.sourceHealthDao().upsert(feed.health.map { it.toEntity() })
+                putMeta("contest_baseline", "1")
+                putMeta("contest_error", "")
+                putMeta("source_count", feed.sourceCount.toString())
+                putMeta("feed_updated_at", feed.updatedAt)
+            }
             contestsOk = true
         } catch (t: Throwable) {
             contestError = t.message ?: t.javaClass.simpleName
-            db.setMeta("contest_error", contestError)
+            putMeta("contest_error", contestError)
         }
 
         try {
-            for (item in remote.fetchAlerts()) {
-                val inserted = db.upsertAlert(item, unreadIfNew = !alertBaseline)
-                if (inserted && !alertBaseline) newAlertIds += item.id
+            val remoteAlerts = remote.fetchAlerts()
+            val existing = db.alertDao().all().associateBy { it.id }
+            val incoming = remoteAlerts.map { item ->
+                val old = existing[item.id]
+                if (old == null && !alertBaseline) newAlertIds += item.id
+                item.toEntity(unread = old?.unread ?: (!alertBaseline))
             }
-            db.setMeta("alert_baseline", "1")
-            db.setMeta("alert_error", "")
+            db.withTransaction {
+                db.alertDao().upsert(incoming)
+                putMeta("alert_baseline", "1")
+                putMeta("alert_error", "")
+            }
             alertsOk = true
         } catch (t: Throwable) {
             alertError = t.message ?: t.javaClass.simpleName
-            db.setMeta("alert_error", alertError)
+            putMeta("alert_error", alertError)
         }
 
-        runCatching { remote.latestReleaseVersion() }.getOrNull()?.let { db.setMeta("latest_release", it) }
-        if (contestsOk || alertsOk) db.setMeta("last_sync", System.currentTimeMillis().toString())
+        runCatching { remote.latestReleaseVersion() }.getOrNull()?.let { putMeta("latest_release", it) }
+        if (contestsOk || alertsOk) putMeta("last_sync", System.currentTimeMillis().toString())
         return SyncResult(contestsOk, alertsOk, contestError, alertError, newContestIds, newAlertIds, health)
     }
 
-    fun setFavorite(id: String, value: Boolean) = db.setFavorite(id, value)
-    fun markContestRead(id: String) = db.markContestRead(id)
-    fun markAlertRead(id: Int) = db.markAlertRead(id)
-    fun markAllContestsRead() = db.markAllContestsRead()
-    fun markAllAlertsRead() = db.markAllAlertsRead()
-    fun sourceCount(): Int = db.meta("source_count")?.toIntOrNull() ?: 0
+    suspend fun setFavorite(id: String, value: Boolean) = db.contestDao().setFavorite(id, value)
+    suspend fun markContestRead(id: String) = db.contestDao().markRead(id)
+    suspend fun markAlertRead(id: Int) = db.alertDao().markRead(id)
+    suspend fun markAllContestsRead() = db.contestDao().markAllRead()
+    suspend fun markAllAlertsRead() = db.alertDao().markAllRead()
 
-    private fun sourceHealthToJson(items: List<SourceHealth>): String = buildString {
-        append('[')
-        items.forEachIndexed { index, s ->
-            if (index > 0) append(',')
-            append("{\"id\":\"").append(escape(s.id)).append("\",\"label\":\"").append(escape(s.label))
-                .append("\",\"ok\":").append(s.ok).append(",\"item_count\":").append(s.itemCount)
-                .append(",\"checked_at\":\"").append(escape(s.checkedAt)).append("\",\"error\":\"").append(escape(s.error)).append("\"}")
-        }
-        append(']')
-    }
-
-    private fun escape(s: String) = s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ")
+    private suspend fun meta(key: String): String? = db.metaDao().get(key)
+    private suspend fun putMeta(key: String, value: String) = db.metaDao().put(MetaEntity(key, value))
 }
+
+private fun ContestEntity.toModel() = Contest(
+    id, title, organization, city, uf, region, scope, type, education, area, remuneration,
+    vacancies, fee, startDate, endDate, status, source, url, editalUrl, firstSeen, lastSeen,
+    priority, favorite, unread, active,
+)
+
+private fun Contest.toEntity(favorite: Boolean, unread: Boolean, active: Boolean, generation: Long) = ContestEntity(
+    id, title, organization, city, uf, region, scope, type, education, area, remuneration,
+    vacancies, fee, startDate, endDate, status, source, url, editalUrl, firstSeen, lastSeen,
+    priority, favorite, unread, active, generation,
+)
+
+private fun AlertEntity.toModel() = AlertItem(id, title, body, url, createdAt, priority, unread)
+private fun AlertItem.toEntity(unread: Boolean) = AlertEntity(id, title, body, url, createdAt, priority, unread)
+
+private fun SourceHealthEntity.toModel() = SourceHealth(
+    id, label, httpOk, parserOk, semanticOk, itemCount, expectedMin, checkedAt, lastSuccessAt, fingerprint, error,
+)
+private fun SourceHealth.toEntity() = SourceHealthEntity(
+    id, label, httpOk, parserOk, semanticOk, itemCount, expectedMin, checkedAt, lastSuccessAt, fingerprint, error,
+)
