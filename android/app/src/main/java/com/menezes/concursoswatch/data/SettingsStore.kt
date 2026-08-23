@@ -3,6 +3,7 @@ package com.menezes.concursoswatch.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.menezes.concursoswatch.model.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,7 @@ class SettingsStore(private val context: Context) {
         val BAIXADA = booleanPreferencesKey("notify_baixada")
         val OPEN = booleanPreferencesKey("notify_only_open")
         val RELEVANT = booleanPreferencesKey("notify_only_relevant")
+        val KEYWORDS = stringPreferencesKey("priority_keywords")
     }
 
     val flow: Flow<UserSettings> = context.dataStore.data.map { p ->
@@ -28,6 +30,7 @@ class SettingsStore(private val context: Context) {
             notifyBaixada = p[Keys.BAIXADA] ?: true,
             notifyOnlyOpen = p[Keys.OPEN] ?: true,
             notifyOnlyRelevant = p[Keys.RELEVANT] ?: true,
+            priorityKeywords = p[Keys.KEYWORDS] ?: UserSettings().priorityKeywords,
         )
     }
 
@@ -39,6 +42,7 @@ class SettingsStore(private val context: Context) {
             p[Keys.BAIXADA] = value.notifyBaixada
             p[Keys.OPEN] = value.notifyOnlyOpen
             p[Keys.RELEVANT] = value.notifyOnlyRelevant
+            p[Keys.KEYWORDS] = value.priorityKeywords
         }
     }
 }
