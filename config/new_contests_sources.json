@@ -10,7 +10,13 @@
     {"id":"guaruja_concursos","label":"Guarujá — Concursos Públicos","city":"Guarujá","region":"SP","scope":"municipal","priority":90,"url":"https://www.guaruja.sp.gov.br/concursos-publicos"},
 
     {"id":"ifsc_certames","label":"IFSC — Concursos e Processos Seletivos","city":"Santa Catarina / campi","region":"SC","scope":"federal","priority":100,"url":"https://certame.ifsc.edu.br/"},
+    {"id":"ifc_editais","label":"IFC — Editais","city":"Santa Catarina / campi","region":"SC","scope":"federal","priority":100,"url":"https://editais.ifc.edu.br/?mode=list"},
+    {"id":"ifc_trabalhe_conosco","label":"IFC — Trabalhe Conosco","city":"Santa Catarina / campi","region":"SC","scope":"federal","priority":100,"url":"https://trabalheconosco.ifc.edu.br/"},
+    {"id":"ifc_sao_bento","label":"IFC — Campus São Bento do Sul","city":"São Bento do Sul","region":"SC","scope":"federal","priority":100,"url":"https://editais.ifc.edu.br/category/campus-sao-bento-do-sul/"},
     {"id":"ufsc_concursos","label":"UFSC — Concursos e Seleções","city":"Florianópolis / Araranguá / Curitibanos / Joinville / Blumenau","region":"SC","scope":"federal","priority":100,"url":"https://concursos.ufsc.br/"},
+    {"id":"uffs_concursos","label":"UFFS — Concursos","city":"Chapecó / Sul","region":"Sul","scope":"federal","priority":95,"url":"https://concursos.uffs.edu.br/"},
+    {"id":"uffs_andamento","label":"UFFS — Concursos em andamento","city":"Chapecó / Sul","region":"Sul","scope":"federal","priority":95,"url":"https://www.uffs.edu.br/uffs/concursos-e-processos-seletivos/concursos-em-andamento"},
+    {"id":"tre_sc_concursos","label":"TRE-SC — Concursos Públicos","city":"Santa Catarina","region":"SC","scope":"federal","priority":100,"url":"https://www.tre-sc.jus.br/institucional/concurso-publico/concurso-publico"},
     {"id":"udesc_concursos","label":"UDESC — Concursos e Processos Seletivos","city":"Santa Catarina","region":"SC","scope":"estadual","priority":100,"url":"https://www.udesc.br/concursospublicos"},
     {"id":"udesc_ceplan_sbs","label":"UDESC CEPLAN — São Bento do Sul","city":"São Bento do Sul","region":"SC","scope":"estadual","priority":100,"url":"https://www.udesc.br/ceplan/concursos"},
     {"id":"tjsc_concursos","label":"TJSC — Concursos de Servidores e Estágio","city":"Santa Catarina","region":"SC","scope":"estadual","priority":100,"url":"https://www.tjsc.jus.br/web/concursos/servidor"},
@@ -33,6 +39,6 @@
   "exclude_terms": [
     "convocação","convocacao","nomeação","nomeacao","posse","resultado","classificação","classificacao","homologação","homologacao","desclassificação","desclassificacao","gabarito","recurso","isenção","isencao","prova física","prova fisica","heteroidentificação","heteroidentificacao","resultado preliminar","resultado definitivo","local de prova","lista de inscritos"
   ],
-  "max_items": 250,
-  "max_seen_urls": 5000
+  "max_items": 300,
+  "max_seen_urls": 8000
 }
