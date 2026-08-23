@@ -1,0 +1,102 @@
+{
+  "failure_threshold": 3,
+  "cloudflare_stale_minutes": 120,
+  "daily_health": {
+    "enabled": false,
+    "timezone": "America/Sao_Paulo",
+    "hour": 9
+  },
+  "sources": [
+    {
+      "id": "pgfn_nacional_estagio_2026",
+      "city": "Nacional",
+      "label": "PGFN — 1ª Seleção Nacional de Estagiários 2026",
+      "url": "https://www.gov.br/pgfn/pt-br/assuntos/noticias/2026/selecao-nacional-de-estagiarios",
+      "mode": "hybrid",
+      "context_radius": 1800,
+      "trigger_terms": [
+        "prova virtual",
+        "consulta",
+        "material",
+        "ferramenta externa",
+        "inteligência artificial",
+        "inteligencia artificial",
+        "IA",
+        "troca de aba",
+        "aba",
+        "navegador",
+        "tempo de prova",
+        "tempo por questão",
+        "tempo por questao",
+        "desconexão",
+        "desconexao",
+        "fiscalização",
+        "fiscalizacao",
+        "eliminação",
+        "eliminacao",
+        "retificação",
+        "retificacao",
+        "comunicado",
+        "edital",
+        "resultado",
+        "recurso"
+      ],
+      "require_groups": [
+        ["seleção nacional de estagiários", "selecao nacional de estagiarios"],
+        ["PGFN", "Procuradoria-Geral da Fazenda Nacional"]
+      ],
+      "document_discovery_any": [
+        "edital",
+        "anexo",
+        "retificação",
+        "retificacao",
+        "comunicado",
+        "prova"
+      ],
+      "document_require_groups": [
+        ["PGFN", "Procuradoria-Geral da Fazenda Nacional"],
+        ["estágio", "estagio", "estagiários", "estagiarios"],
+        ["prova", "consulta", "material", "eliminação", "eliminacao", "retificação", "retificacao"]
+      ]
+    },
+    {
+      "id": "ciee_pgfn_17291",
+      "city": "Nacional",
+      "label": "CIEE — PGFN graduação 2026",
+      "url": "https://pp.ciee.org.br/vitrine/17291/detalhe",
+      "mode": "hybrid",
+      "context_radius": 1800,
+      "trigger_terms": [
+        "prova",
+        "consulta",
+        "material",
+        "ferramenta externa",
+        "inteligência artificial",
+        "inteligencia artificial",
+        "IA",
+        "aba",
+        "navegador",
+        "tempo",
+        "desconexão",
+        "desconexao",
+        "fiscalização",
+        "fiscalizacao",
+        "eliminação",
+        "eliminacao",
+        "retificação",
+        "retificacao",
+        "comunicado",
+        "edital",
+        "anexo"
+      ],
+      "require_groups": [
+        ["PGFN", "Procuradoria-Geral da Fazenda Nacional", "17291"]
+      ],
+      "document_discovery_any": ["edital", "anexo", "retificação", "retificacao", "comunicado"],
+      "document_require_groups": [
+        ["PGFN", "Procuradoria-Geral da Fazenda Nacional"],
+        ["prova", "consulta", "material", "eliminação", "eliminacao", "retificação", "retificacao"]
+      ]
+    }
+  ]
+}
