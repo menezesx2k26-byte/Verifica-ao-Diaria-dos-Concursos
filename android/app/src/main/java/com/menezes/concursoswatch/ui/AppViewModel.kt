@@ -17,64 +17,49 @@ import com.menezes.concursoswatch.model.UserSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 data class AppUiState(
-    val contests: List<Contest> = emptyList(),
-    val alerts: List<AlertItem> = emptyList(),
-    val sourceHealth: List<SourceHealth> = emptyList(),
-    val regionFilter: RegionFilter = RegionFilter.ALL,
-    val statusFilter: StatusFilter = StatusFilter.ALL,
-    val search: String = "",
-    val syncing: Boolean = false,
-    val lastSync: Long = 0L,
-    val contestError: String? = null,
-    val alertError: String? = null,
-    val sourceCount: Int = 0,
-    val healthySources: Int = 0,
-    val settings: UserSettings = UserSettings(),
-    val latestRelease: String? = null,
-    val selectedContest: Contest? = null,
+    val contests: List<Contest> = emptyList(), val alerts: List<AlertItem> = emptyList(),
+    val sourceHealth: List<SourceHealth> = emptyList(), val regionFilter: RegionFilter = RegionFilter.ALL,
+    val statusFilter: StatusFilter = StatusFilter.ALL, val search: String = "", val syncing: Boolean = false,
+    val lastSync: Long = 0L, val contestError: String? = null, val alertError: String? = null,
+    val sourceCount: Int = 0, val healthySources: Int = 0, val settings: UserSettings = UserSettings(),
+    val latestRelease: String? = null, val selectedContest: Contest? = null,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ContestRepository(app)
     private val settingsStore = SettingsStore(app)
-
-    var state by mutableStateOf(AppUiState())
-        private set
+    var state by mutableStateOf(AppUiState()); private set
 
     init {
         reload()
-        viewModelScope.launch {
-            settingsStore.flow.collectLatest { state = state.copy(settings = it) }
-        }
+        viewModelScope.launch { settingsStore.flow.collectLatest { state = state.copy(settings = it) } }
     }
 
     fun reload() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val health = repo.sourceHealth()
-            state = state.copy(
-                contests = repo.contests(),
-                alerts = repo.alerts(),
-                sourceHealth = health,
-                lastSync = repo.lastSync(),
-                contestError = repo.lastContestError(),
-                alertError = repo.lastAlertError(),
-                sourceCount = repo.sourceCount(),
-                healthySources = health.count { it.ok },
-                latestRelease = repo.latestKnownRelease(),
-            )
+        viewModelScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                val health = repo.sourceHealth()
+                state.copy(
+                    contests = repo.contests(), alerts = repo.alerts(), sourceHealth = health,
+                    lastSync = repo.lastSync(), contestError = repo.lastContestError(), alertError = repo.lastAlertError(),
+                    sourceCount = repo.sourceCount(), healthySources = health.count { it.ok }, latestRelease = repo.latestKnownRelease(),
+                )
+            }
+            state = loaded
         }
     }
 
     fun syncNow() {
         if (state.syncing) return
         state = state.copy(syncing = true)
-        viewModelScope.launch(Dispatchers.IO) {
-            repo.syncAll()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { repo.syncAll() }
             state = state.copy(syncing = false)
             reload()
         }
@@ -85,31 +70,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setStatus(value: StatusFilter) { state = state.copy(statusFilter = value) }
 
     fun loadContest(id: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            repo.markContestRead(id)
-            state = state.copy(selectedContest = repo.contest(id)?.copy(unread = false))
+        viewModelScope.launch {
+            val selected = withContext(Dispatchers.IO) { repo.markContestRead(id); repo.contest(id)?.copy(unread = false) }
+            state = state.copy(selectedContest = selected)
             reload()
         }
     }
 
-    fun markAlertRead(a: AlertItem) = viewModelScope.launch(Dispatchers.IO) {
-        repo.markAlertRead(a.id)
-        reload()
-    }
-
-    fun toggleFavorite(c: Contest) = viewModelScope.launch(Dispatchers.IO) {
-        repo.setFavorite(c.id, !c.favorite)
+    fun markAlertRead(a: AlertItem) = viewModelScope.launch { withContext(Dispatchers.IO) { repo.markAlertRead(a.id) }; reload() }
+    fun toggleFavorite(c: Contest) = viewModelScope.launch {
+        withContext(Dispatchers.IO) { repo.setFavorite(c.id, !c.favorite) }
         state = state.copy(selectedContest = state.selectedContest?.takeIf { it.id == c.id }?.copy(favorite = !c.favorite) ?: state.selectedContest)
         reload()
     }
-
-    fun markAllContestsRead() = viewModelScope.launch(Dispatchers.IO) { repo.markAllContestsRead(); reload() }
-    fun markAllAlertsRead() = viewModelScope.launch(Dispatchers.IO) { repo.markAllAlertsRead(); reload() }
+    fun markAllContestsRead() = viewModelScope.launch { withContext(Dispatchers.IO) { repo.markAllContestsRead() }; reload() }
+    fun markAllAlertsRead() = viewModelScope.launch { withContext(Dispatchers.IO) { repo.markAllAlertsRead() }; reload() }
     fun saveSettings(s: UserSettings) { viewModelScope.launch { settingsStore.save(s) } }
 
     fun filteredContests(favoritesOnly: Boolean = false): List<Contest> {
-        val q = state.search.trim().lowercase()
-        val today = LocalDate.now()
+        val q = state.search.trim().lowercase(); val today = LocalDate.now()
         return state.contests.filter { c ->
             if (favoritesOnly && !c.favorite) return@filter false
             if (!favoritesOnly && !c.active) return@filter false
@@ -126,7 +105,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 StatusFilter.NEW -> c.unread
                 StatusFilter.CLOSING_SOON -> parseDate(c.endDate)?.let { ChronoUnit.DAYS.between(today, it) in 0..7 } ?: false
             }
-            val searchOk = q.isBlank() || listOf(c.title, c.organization, c.city, c.area, c.education, c.type, c.source).any { it.lowercase().contains(q) }
+            val searchOk = q.isBlank() || listOf(c.title,c.organization,c.city,c.area,c.education,c.type,c.source).any { it.lowercase().contains(q) }
             regionOk && statusOk && searchOk
         }
     }
@@ -142,10 +121,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun relativeSync(): String {
         if (state.lastSync == 0L) return "Nunca sincronizado"
         val minutes = ChronoUnit.MINUTES.between(Instant.ofEpochMilli(state.lastSync), Instant.now())
-        return when {
-            minutes < 1 -> "agora"
-            minutes < 60 -> "há ${minutes} min"
-            else -> "há ${minutes / 60} h"
-        }
+        return when { minutes < 1 -> "agora"; minutes < 60 -> "há ${minutes} min"; else -> "há ${minutes / 60} h" }
     }
 }
