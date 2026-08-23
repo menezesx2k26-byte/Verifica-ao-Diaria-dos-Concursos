@@ -1,5 +1,6 @@
 package com.menezes.concursoswatch.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -18,19 +19,19 @@ data class ContestEntity(
     val remuneration: String,
     val vacancies: String,
     val fee: String,
-    val startDate: String,
-    val endDate: String,
+    @ColumnInfo(name = "start_date") val startDate: String,
+    @ColumnInfo(name = "end_date") val endDate: String,
     val status: String,
     val source: String,
     val url: String,
-    val editalUrl: String,
-    val firstSeen: String,
-    val lastSeen: String,
+    @ColumnInfo(name = "edital_url") val editalUrl: String,
+    @ColumnInfo(name = "first_seen") val firstSeen: String,
+    @ColumnInfo(name = "last_seen") val lastSeen: String,
     val priority: Int,
     val favorite: Boolean = false,
     val unread: Boolean = false,
     val active: Boolean = true,
-    val syncGeneration: Long = 0L,
+    @ColumnInfo(name = "sync_generation") val syncGeneration: Long = 0L,
 )
 
 @Entity(tableName = "alerts")
@@ -39,7 +40,7 @@ data class AlertEntity(
     val title: String,
     val body: String,
     val url: String,
-    val createdAt: String,
+    @ColumnInfo(name = "created_at") val createdAt: String,
     val priority: Int,
     val unread: Boolean = false,
 )
@@ -48,13 +49,13 @@ data class AlertEntity(
 data class SourceHealthEntity(
     @PrimaryKey val id: String,
     val label: String,
-    val httpOk: Boolean,
-    val parserOk: Boolean,
-    val semanticOk: Boolean,
-    val itemCount: Int,
-    val expectedMin: Int,
-    val checkedAt: String,
-    val lastSuccessAt: String,
+    @ColumnInfo(name = "http_ok") val httpOk: Boolean,
+    @ColumnInfo(name = "parser_ok") val parserOk: Boolean,
+    @ColumnInfo(name = "semantic_ok") val semanticOk: Boolean,
+    @ColumnInfo(name = "item_count") val itemCount: Int,
+    @ColumnInfo(name = "expected_min") val expectedMin: Int,
+    @ColumnInfo(name = "checked_at") val checkedAt: String,
+    @ColumnInfo(name = "last_success_at") val lastSuccessAt: String,
     val fingerprint: String,
     val error: String,
 )
