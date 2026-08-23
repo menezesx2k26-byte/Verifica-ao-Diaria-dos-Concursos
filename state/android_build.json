@@ -1,9 +1,9 @@
 {
-  "build_outcome": "skipped",
+  "build_outcome": "cancelled",
   "publish_outcome": "skipped",
-  "run_id": "32671686803",
+  "run_id": "32671715154",
   "run_attempt": "1",
-  "sha": "6a7c0d802e0d595fae2a26b5cc7f905bb54f580c",
+  "sha": "023199fef87295d2e414401f09f54715c35c1ce1",
   "release_url": "https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v1.3.0",
-  "build_log_tail": ""
+  "build_log_tail": "Starting a Gradle Daemon (subsequent builds will be faster)\n> Task :app:preBuild UP-TO-DATE\n> Task :app:preDebugBuild UP-TO-DATE\n> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE\n> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED\n> Task :app:generateDebugBuildConfig"
 }
