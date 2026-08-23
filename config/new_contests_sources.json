@@ -1,0 +1,69 @@
+{
+  "sources": [
+    {
+      "id": "ifsp_concursos",
+      "label": "IFSP — Concursos Públicos",
+      "city": "São Paulo / campi",
+      "url": "https://concurso.ifsp.edu.br/"
+    },
+    {
+      "id": "praia_grande_concursos",
+      "label": "Praia Grande — Concursos e Processos Seletivos",
+      "city": "Praia Grande",
+      "url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187"
+    },
+    {
+      "id": "sao_vicente_concursos",
+      "label": "São Vicente — Concursos",
+      "city": "São Vicente",
+      "url": "https://www.saovicente.sp.gov.br/institucional/concursos"
+    },
+    {
+      "id": "santos_concursos",
+      "label": "Santos — Concursos",
+      "city": "Santos",
+      "url": "https://www.santos.sp.gov.br/?q=busca/concurso"
+    },
+    {
+      "id": "cubatao_concursos",
+      "label": "Cubatão — Concursos Públicos",
+      "city": "Cubatão",
+      "url": "https://www.cubatao.sp.gov.br/concursopublico/"
+    }
+  ],
+  "include_terms": [
+    "concurso público",
+    "concurso publico",
+    "processo seletivo",
+    "processo simplificado",
+    "professor substituto",
+    "seleção de estagiários",
+    "selecao de estagiarios",
+    "inscrições abertas",
+    "inscricoes abertas",
+    "edital"
+  ],
+  "exclude_terms": [
+    "convocação",
+    "convocacao",
+    "nomeação",
+    "nomeacao",
+    "posse",
+    "resultado",
+    "classificação",
+    "classificacao",
+    "homologação",
+    "homologacao",
+    "desclassificação",
+    "desclassificacao",
+    "gabarito",
+    "recurso",
+    "isenção",
+    "isencao",
+    "prova física",
+    "prova fisica",
+    "heteroidentificação",
+    "heteroidentificacao"
+  ],
+  "max_items": 60
+}
