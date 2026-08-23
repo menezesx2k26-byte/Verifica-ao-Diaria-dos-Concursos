@@ -18,7 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -31,46 +31,97 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Build debug APK
-        id: build_apk
+      - name: Compile and test installable dev APK
+        id: build_debug
         shell: bash
         run: |
           set -o pipefail
           gradle -p android :app:assembleDebug --stacktrace 2>&1 | tee android-build.log
-
-      - name: Prepare APK
-        if: steps.build_apk.outcome == 'success'
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk ConcursosWatch.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk ConcursosWatch-v2.0.0-dev.apk
+          sha256sum ConcursosWatch-v2.0.0-dev.apk > ConcursosWatch-v2.0.0-dev.apk.sha256
 
       - uses: actions/upload-artifact@v4
-        if: steps.build_apk.outcome == 'success'
+        if: steps.build_debug.outcome == 'success'
         with:
-          name: ConcursosWatch-APK
-          path: ConcursosWatch.apk
+          name: ConcursosWatch-v2.0.0-dev
+          path: |
+            ConcursosWatch-v2.0.0-dev.apk
+            ConcursosWatch-v2.0.0-dev.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish APK release
-        id: publish_apk
-        if: steps.build_apk.outcome == 'success'
+      - name: Publish dev release
+        if: steps.build_debug.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
-          if gh release view android-v1.3.0 >/dev/null 2>&1; then
-            gh release upload android-v1.3.0 ConcursosWatch.apk --clobber
+          TAG="android-v2.0.0-dev"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" ConcursosWatch-v2.0.0-dev.apk ConcursosWatch-v2.0.0-dev.apk.sha256 --clobber
           else
-            gh release create android-v1.3.0 ConcursosWatch.apk \
+            gh release create "$TAG" ConcursosWatch-v2.0.0-dev.apk ConcursosWatch-v2.0.0-dev.apk.sha256 \
               --target "$GITHUB_SHA" \
-              --title "Concursos Watch Android v1.3.0" \
-              --notes "Redesign completo do app: dashboard escuro, cards de status, alertas importantes, concursos novos, filtros rápidos e navegação inferior, mantendo o monitor e notificações."
+              --title "Concursos Watch Android v2.0.0 DEV" \
+              --notes "Build instalável de desenvolvimento. V2 reestruturada: Compose, banco local, filtros reais, busca, favoritos, histórico, configurações, sincronização parcial e feed estruturado. Não confundir com release de produção assinada."
+          fi
+
+      - name: Prepare production signing
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ -n "$KEYSTORE_B64" && -n "$STORE_PASSWORD" && -n "$KEY_ALIAS" && -n "$KEY_PASSWORD" ]]; then
+            echo "$KEYSTORE_B64" | base64 -d > android/release.keystore
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build signed production release
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          gradle -p android :app:assembleRelease \
+            -PRELEASE_STORE_FILE=release.keystore \
+            -PRELEASE_STORE_PASSWORD="$STORE_PASSWORD" \
+            -PRELEASE_KEY_ALIAS="$KEY_ALIAS" \
+            -PRELEASE_KEY_PASSWORD="$KEY_PASSWORD" \
+            --stacktrace
+          cp android/app/build/outputs/apk/release/app-release.apk ConcursosWatch-v2.0.0.apk
+          sha256sum ConcursosWatch-v2.0.0.apk > ConcursosWatch-v2.0.0.apk.sha256
+
+      - name: Publish signed production release
+        if: steps.signing.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="android-v2.0.0"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" ConcursosWatch-v2.0.0.apk ConcursosWatch-v2.0.0.apk.sha256 --clobber
+          else
+            gh release create "$TAG" ConcursosWatch-v2.0.0.apk ConcursosWatch-v2.0.0.apk.sha256 \
+              --target "$GITHUB_SHA" \
+              --title "Concursos Watch Android v2.0.0" \
+              --notes "Release de produção assinada do Concursos Watch v2.0.0."
           fi
 
       - name: Persist build diagnostics
         if: always()
         env:
-          BUILD_OUTCOME: ${{ steps.build_apk.outcome }}
-          PUBLISH_OUTCOME: ${{ steps.publish_apk.outcome }}
+          BUILD_OUTCOME: ${{ steps.build_debug.outcome }}
+          SIGNING_READY: ${{ steps.signing.outputs.ready }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           SHA: ${{ github.sha }}
@@ -79,16 +130,16 @@ jobs:
           python - <<'PY'
           import json, os, pathlib
           log = pathlib.Path('android-build.log')
-          tail = ''
-          if log.exists():
-              tail = '\n'.join(log.read_text(errors='replace').splitlines()[-80:])
+          tail = '\n'.join(log.read_text(errors='replace').splitlines()[-80:]) if log.exists() else ''
           status = {
+              'version': '2.0.0',
               'build_outcome': os.environ.get('BUILD_OUTCOME',''),
-              'publish_outcome': os.environ.get('PUBLISH_OUTCOME',''),
+              'production_signing_configured': os.environ.get('SIGNING_READY','') == 'true',
               'run_id': os.environ.get('RUN_ID',''),
               'run_attempt': os.environ.get('RUN_ATTEMPT',''),
               'sha': os.environ.get('SHA',''),
-              'release_url': 'https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v1.3.0',
+              'dev_release_url': 'https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v2.0.0-dev',
+              'production_release_url': 'https://github.com/menezesx2k26-byte/Verifica-ao-Diaria-dos-Concursos/releases/tag/android-v2.0.0',
               'build_log_tail': tail,
           }
           pathlib.Path('state').mkdir(exist_ok=True)
@@ -97,6 +148,6 @@ jobs:
           git config user.name "concursos-watch[bot]"
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
           git add state/android_build.json
-          git commit -m "chore(android): record build status" || exit 0
+          git commit -m "chore(android): record v2 build status" || exit 0
           git pull --rebase origin main
           git push origin HEAD:main
