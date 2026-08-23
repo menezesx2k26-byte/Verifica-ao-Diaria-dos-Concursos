@@ -63,6 +63,7 @@ data class UserSettings(
     val notifyBaixada: Boolean = true,
     val notifyOnlyOpen: Boolean = true,
     val notifyOnlyRelevant: Boolean = true,
+    val priorityKeywords: String = "matemática, mecatrônica, TI, administrativo, estágio, IFSP, TJSP, TJSC, IFSC, UFSC, São Bento do Sul",
 )
 
 enum class RegionFilter { ALL, FEDERAL, SC, SUL, BAIXADA }
