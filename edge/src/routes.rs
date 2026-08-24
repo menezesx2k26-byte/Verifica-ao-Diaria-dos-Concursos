@@ -6,6 +6,7 @@ use crate::query::ContestFilters;
 use crate::route_key;
 use crate::security::{
     build_dashboard_manifest, bundle_etag, dashboard_security_headers, sha256_hex,
+    DashboardManifestInput,
 };
 use serde::Serialize;
 use worker::{Env, Request, Response};
@@ -119,19 +120,21 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
             }
             let url = req.url().map_err(|_| AppError::BadRequest("invalid_url"))?;
             let origin = url.origin().ascii_serialization();
-            let manifest = build_dashboard_manifest(
-                bundle.config.dashboard_version,
-                bundle.config.style_version,
-                &bundle.config.min_app_version,
-                &bundle.published_at,
-                &format!("{origin}/dashboard"),
-                &format!(
-                    "{origin}/assets/dashboard.css?v={}",
-                    bundle.config.style_version
-                ),
-                bundle.html.as_bytes(),
-                bundle.css.as_bytes(),
+            let html_url = format!("{origin}/dashboard");
+            let css_url = format!(
+                "{origin}/assets/dashboard.css?v={}",
+                bundle.config.style_version
             );
+            let manifest = build_dashboard_manifest(DashboardManifestInput {
+                dashboard_version: bundle.config.dashboard_version,
+                style_version: bundle.config.style_version,
+                min_app_version: &bundle.config.min_app_version,
+                published_at: &bundle.published_at,
+                html_url: &html_url,
+                css_url: &css_url,
+                html: bundle.html.as_bytes(),
+                css: bundle.css.as_bytes(),
+            });
             let mut response = Response::from_json(&manifest).map_err(|_| AppError::Internal)?;
             apply_common_headers(
                 &mut response,
