@@ -55,7 +55,7 @@ mod runtime {
     use crate::error::AppError;
     use crate::models::{AlertDto, ContestDto, SourceHealthDto};
     use serde::Deserialize;
-    use worker::d1::D1Database;
+    use worker::d1::{D1Database, D1Type};
 
     const CONTEST_FIELDS: &str = "id, organization, title, city, uf, region, scope, type, education, area, remuneration, vacancies, fee, registration_start, registration_end, status, source, source_url, edital_url, priority, active, first_seen, last_seen, updated_at";
 
@@ -164,14 +164,22 @@ mod runtime {
         sections_json: String,
     }
 
+    fn d1_text_params(params: &[String]) -> Vec<D1Type<'_>> {
+        params
+            .iter()
+            .map(|value| D1Type::Text(value.as_str()))
+            .collect()
+    }
+
     pub async fn list_contests(
         db: &D1Database,
         filters: &ContestFilters,
     ) -> Result<Vec<ContestDto>, AppError> {
         let (sql, params) = build_contest_query(filters);
+        let d1_params = d1_text_params(&params);
         let statement = db
             .prepare(&sql)
-            .bind_refs(params.iter())
+            .bind_refs(d1_params.iter())
             .map_err(|_| AppError::Internal)?;
         let result = statement.all().await.map_err(|_| AppError::Internal)?;
         let rows: Vec<ContestRow> = result.results().map_err(|_| AppError::Internal)?;
@@ -183,9 +191,10 @@ mod runtime {
             "SELECT {CONTEST_FIELDS} FROM contests WHERE active = 1 AND relevance_status = ? AND id = ? LIMIT 1"
         );
         let params = ["ACCEPTED".to_string(), id.to_string()];
+        let d1_params = d1_text_params(&params);
         let row: Option<ContestRow> = db
             .prepare(&sql)
-            .bind_refs(params.iter())
+            .bind_refs(d1_params.iter())
             .map_err(|_| AppError::Internal)?
             .first(None)
             .await
