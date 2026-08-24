@@ -39,6 +39,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         reload()
         viewModelScope.launch { settingsStore.flow.collectLatest { state = state.copy(settings = it) } }
+        // A first launch must never sit on an empty "waiting for the 15-minute worker" state.
+        // Refresh immediately; WorkManager remains the background safety net afterwards.
+        syncNow()
     }
 
     fun reload() {
@@ -120,7 +123,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }.getOrNull()
 
     fun relativeSync(): String {
-        if (state.lastSync == 0L) return "Nunca sincronizado"
+        if (state.lastSync == 0L) return if (state.syncing) "em andamento" else "ainda não realizada"
         val minutes = ChronoUnit.MINUTES.between(Instant.ofEpochMilli(state.lastSync), Instant.now())
         return when { minutes < 1 -> "agora"; minutes < 60 -> "há ${minutes} min"; else -> "há ${minutes / 60} h" }
     }
