@@ -1,7 +1,7 @@
 # Concursos Watch v4 — Política de relevância, filtros e quarentena
 
 Data: 2026-08-24
-Status: aprovado em conversa; parte normativa da arquitetura v4.
+Status: aprovado em conversa; auto-revisão concluída; parte normativa da arquitetura v4.
 
 Este documento complementa `2026-08-23-concursos-watch-hybrid-rust-dashboard-design.md` e é obrigatório para a implementação da v4.
 
@@ -34,9 +34,9 @@ Nenhum item pode pular etapas.
 
 Antes de qualquer classificação de concurso, o pipeline deve rejeitar conteúdos claramente pertencentes a outros domínios administrativos.
 
-### 3.1 Termos proibidos de contratação pública
+### 3.1 Termos de contratação pública
 
-Exemplos mínimos:
+Sinais mínimos a considerar:
 
 ```text
 licitação
@@ -58,7 +58,7 @@ fornecedores
 contratação de empresa
 contratacao de empresa
 aquisição
-quisicao
+aquisicao
 contrato administrativo
 dispensa de licitação
 dispensa de licitacao
@@ -70,7 +70,7 @@ termo de referência
 termo de referencia
 ```
 
-### 3.2 Sinais de URL proibidos
+### 3.2 Sinais de URL de contratação pública
 
 Exemplos mínimos:
 
@@ -86,7 +86,7 @@ Exemplos mínimos:
 /leilao/
 ```
 
-Esses sinais têm precedência sobre o termo `edital`.
+Esses sinais têm precedência sobre o termo genérico `edital`.
 
 Exemplo:
 
@@ -101,6 +101,27 @@ REJECTED_PROCUREMENT
 ```
 
 Nunca `Contest`.
+
+### 3.3 Regra contra overblocking
+
+Uma única palavra de domínio administrativo não basta para `REJECTED_PROCUREMENT` quando também existem sinais claros de recrutamento.
+
+Exemplo legítimo que não pode ser descartado automaticamente:
+
+```text
+Concurso Público — Analista Administrativo — área de licitações e contratos
+```
+
+A rejeição dura exige que o documento ou URL caracterize a publicação como processo de contratação pública, por exemplo por combinação de:
+
+```text
+URL /licitacoes/ ou /pregao/
++ modalidade pregão/concorrência/leilão
++ objeto/aquisição/fornecedor/proposta
++ ausência de recruitment gate positivo
+```
+
+Quando sinais de recrutamento e contratação pública entrarem em conflito e não houver decisão segura, usar `QUARANTINED_LOW_CONFIDENCE`.
 
 ## 4. Recruitment gate positivo
 
@@ -235,9 +256,17 @@ Exemplo conceitual:
 }
 ```
 
+### 6.1 Mudança de perfil não exige novo crawl
+
+Um item rejeitado apenas por `REJECTED_INTEREST_FILTER` continua armazenado em `candidate_decisions` com seus campos normalizados e validade temporal.
+
+Quando o perfil mudar, candidatos ainda válidos devem ser reavaliados imediatamente. Assim, habilitar uma nova região, escolaridade ou área pode fazer oportunidades já conhecidas aparecerem sem aguardar que a fonte oficial seja coletada novamente.
+
+Itens rejeitados por domínio (`REJECTED_PROCUREMENT`, `REJECTED_NAVIGATION`, `REJECTED_NO_RECRUITMENT_SIGNAL`) não podem ser reabilitados apenas por um filtro de preferência.
+
 ## 7. Exact watches
 
-Acompanhamentos explícitos do usuário não dependem do filtro genérico de descoberta.
+Acompanhamentos explícitos não dependem do filtro genérico de descoberta.
 
 Eles são definidos por identidade canônica e regras dedicadas, por exemplo:
 
@@ -310,7 +339,7 @@ Responsável por descobrir, validar, classificar e decidir o estado do candidato
 
 Somente itens `ACCEPTED` entram na coleção operacional de concursos consumida pelo app.
 
-Quarentena e rejeições ficam disponíveis apenas para diagnóstico e testes.
+Quarentena e rejeições ficam disponíveis apenas para diagnóstico, reavaliação de perfil e testes.
 
 ### D1
 
@@ -328,7 +357,7 @@ A API pública não lista quarentena por padrão.
 
 A API Rust deve servir apenas entidades `ACCEPTED` nas rotas normais de concursos.
 
-Filtros de query da API nunca podem reabilitar um item previamente rejeitado pelo pipeline.
+Filtros de query da API nunca podem reabilitar um item previamente rejeitado pelo pipeline de domínio.
 
 ### Android
 
@@ -343,7 +372,7 @@ O estado atual contém falsos positivos de contratação pública e navegação 
 A migração v4 deve:
 
 1. reprocessar o estado histórico com a nova política;
-2. remover do feed operacional todos os itens de licitação/pregão/compras;
+2. remover do feed operacional todos os itens de licitação/pregão/compras que não sejam recrutamento;
 3. remover links institucionais sem recrutamento;
 4. preservar IDs canônicos apenas dos concursos válidos;
 5. não disparar notificações de remoção em massa;
@@ -382,6 +411,7 @@ Professor Substituto
 Técnico-Administrativo em Educação
 Seleção de Estagiários
 Residência
+Concurso Público — Analista Administrativo — área de licitações e contratos
 ```
 
 ## 12. Testes obrigatórios
@@ -389,13 +419,15 @@ Residência
 ### Unitários
 
 - `edital` isolado não abre recruitment gate;
-- `edital + pregão` é rejeitado;
-- URL `/licitacoes/` é rejeitada mesmo contendo `edital`;
+- `edital + pregão` de contratação pública é rejeitado;
+- URL `/licitacoes/` com sinais de contratação pública é rejeitada;
+- palavra `licitação` dentro da descrição de um cargo de concurso não causa hard reject sozinha;
 - `processo seletivo` válido passa;
 - `professor substituto` passa;
 - navegação institucional é rejeitada;
 - sinais acentuados e não acentuados têm comportamento equivalente;
 - filtros de interesse funcionam independentemente do gate de recrutamento;
+- alteração de perfil reavalia candidatos ainda válidos sem novo crawl;
 - exact watch não é descartado porque inscrições fecharam;
 - item ambíguo vai para quarentena.
 
@@ -435,13 +467,14 @@ A política só é considerada concluída quando:
 1. nenhum exemplo conhecido de pregão/licitação entra como concurso;
 2. `edital` isolado não é suficiente para inclusão;
 3. links institucionais genéricos não entram no feed;
-4. concursos reais continuam passando;
+4. concursos reais continuam passando, inclusive cargos cuja área mencione licitações;
 5. itens ambíguos ficam invisíveis ao usuário em quarentena;
 6. filtros específicos podem ser alterados sem novo APK;
-7. exact watches continuam funcionando mesmo fora do período de inscrição;
-8. decisões são auditáveis;
-9. CI contém regressões negativas e positivas;
-10. limpeza do legado não dispara alertas falsos.
+7. mudança de perfil reavalia candidatos válidos sem novo crawl;
+8. exact watches continuam funcionando mesmo fora do período de inscrição;
+9. decisões são auditáveis;
+10. CI contém regressões negativas e positivas;
+11. limpeza do legado não dispara alertas falsos.
 
 ## 15. Decisão final
 
