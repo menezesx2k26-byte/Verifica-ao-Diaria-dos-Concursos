@@ -267,8 +267,10 @@ mod tests {
 
     #[test]
     fn values_never_enter_sql_text() {
-        let mut filters = ContestFilters::default();
-        filters.area = Some("x' OR 1=1 --".into());
+        let filters = ContestFilters {
+            area: Some("x' OR 1=1 --".into()),
+            ..ContestFilters::default()
+        };
         let (sql, params) = build_contest_query(&filters);
         assert!(!sql.contains("OR 1=1"));
         assert!(params.iter().any(|p| p == "x' OR 1=1 --"));
