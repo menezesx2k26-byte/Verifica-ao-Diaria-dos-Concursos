@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS contests (
   edital_url TEXT NOT NULL DEFAULT '',
   priority INTEGER NOT NULL DEFAULT 50,
   active INTEGER NOT NULL DEFAULT 1,
+  relevance_status TEXT NOT NULL DEFAULT 'ACCEPTED',
+  relevance_confidence INTEGER NOT NULL DEFAULT 100,
   first_seen TEXT NOT NULL,
   last_seen TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -33,6 +35,7 @@ CREATE TABLE IF NOT EXISTS contests (
 CREATE INDEX IF NOT EXISTS idx_contests_status ON contests(status, active);
 CREATE INDEX IF NOT EXISTS idx_contests_region ON contests(uf, region, scope);
 CREATE INDEX IF NOT EXISTS idx_contests_priority ON contests(priority DESC, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_contests_relevance ON contests(relevance_status, active, priority DESC, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
@@ -95,6 +98,17 @@ CREATE TABLE IF NOT EXISTS alerts (
   FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS dashboard_configs (
+  version INTEGER PRIMARY KEY,
+  schema_version INTEGER NOT NULL,
+  style_version INTEGER NOT NULL,
+  min_app_version TEXT NOT NULL,
+  published_at TEXT NOT NULL,
+  sections_json TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('draft', 'published', 'superseded'))
+);
+CREATE INDEX IF NOT EXISTS idx_dashboard_configs_status ON dashboard_configs(status, version DESC);
 
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
