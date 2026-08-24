@@ -75,6 +75,7 @@ NAVIGATION_PATHS = (
     "/corregedoria",
     "/decanato",
     "/links/index",
+    "/institucional",
 )
 RECRUITMENT_TERMS = (
     "concurso publico",
@@ -115,6 +116,7 @@ def _hits(corpus: str, terms: tuple[str, ...]) -> tuple[str, ...]:
 
 def evaluate_candidate(title: str, context: str, url: str) -> RelevanceDecision:
     path = fold_relevance(urlparse(url).path)
+    folded_title = fold_relevance(title)
     corpus = fold_relevance(f"{title} {context} {path}")
 
     procurement_hits = _hits(corpus, PROCUREMENT_TERMS)
@@ -129,15 +131,23 @@ def evaluate_candidate(title: str, context: str, url: str) -> RelevanceDecision:
         )
 
     navigation_hits = _hits(corpus, NAVIGATION_TERMS)
+    title_navigation_hits = _hits(folded_title, NAVIGATION_TERMS)
     navigation_path_hits = tuple(p for p in NAVIGATION_PATHS if p in path)
     positive_hits = _hits(corpus, RECRUITMENT_TERMS)
-    if (navigation_hits or navigation_path_hits) and not positive_hits:
-        negatives = tuple(dict.fromkeys(navigation_hits + navigation_path_hits))
+    if title_navigation_hits or navigation_path_hits:
+        negatives = tuple(dict.fromkeys(title_navigation_hits + navigation_path_hits))
+        return RelevanceDecision(
+            status=REJECTED_NAVIGATION,
+            reason="link institucional ou de navegação identificado pelo próprio destino",
+            confidence=100,
+            negative_signals=negatives,
+        )
+    if navigation_hits and not positive_hits:
         return RelevanceDecision(
             status=REJECTED_NAVIGATION,
             reason="link institucional ou de navegação sem recrutamento",
             confidence=98,
-            negative_signals=negatives,
+            negative_signals=navigation_hits,
         )
 
     if positive_hits:
