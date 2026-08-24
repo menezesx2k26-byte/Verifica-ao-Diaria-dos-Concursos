@@ -28,7 +28,10 @@ mod tests {
     #[test]
     fn contest_routes_are_read_only() {
         assert_eq!(route_key("GET", "/api/v1/contests"), "contests");
-        assert_eq!(route_key("GET", "/api/v1/contests/abc123"), "contest_detail");
+        assert_eq!(
+            route_key("GET", "/api/v1/contests/abc123"),
+            "contest_detail"
+        );
         assert_eq!(route_key("POST", "/api/v1/contests"), "method_not_allowed");
     }
 
@@ -36,6 +39,9 @@ mod tests {
     fn alerts_and_sources_are_read_only() {
         assert_eq!(route_key("GET", "/api/v1/alerts"), "alerts");
         assert_eq!(route_key("GET", "/api/v1/sources"), "sources");
-        assert_eq!(route_key("DELETE", "/api/v1/alerts"), "method_not_allowed");
+        assert_eq!(
+            route_key("DELETE", "/api/v1/alerts"),
+            "method_not_allowed"
+        );
     }
 }
