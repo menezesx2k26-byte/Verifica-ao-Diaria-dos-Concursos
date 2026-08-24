@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from collections import Counter
 import hashlib
 import json
 import os
@@ -13,8 +14,11 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 import requests
 from bs4 import BeautifulSoup
 
+from relevance_filter import ACCEPTED, evaluate_candidate, matches_interest_profile
+
 CONFIG = Path(os.getenv("NEW_CONTESTS_CONFIG", "config/new_contests_sources.json"))
 STATE = Path(os.getenv("NEW_CONTESTS_STATE", "state/new_contests.json"))
+DIAGNOSTICS = Path(os.getenv("RELEVANCE_DIAGNOSTICS_STATE", "state/relevance_diagnostics.json"))
 TIMEOUT = 25
 TRACKING_PREFIXES = ("utm_", "fbclid", "gclid")
 OFFICIAL_EXTERNAL_HOST_FRAGMENTS = (
@@ -177,7 +181,6 @@ def is_stale_candidate(title: str, context: str, href: str, status: str, end_dat
     years = [int(y) for y in re.findall(r"\b(19\d{2}|20\d{2})\b", corpus)]
     if years and max(years) < current - 1:
         return True
-    # Common archive format: "Edital 141/07" or "edital-141-2007".
     short_years = [int(y) for y in re.findall(r"(?:edital[^\n]{0,30}|/|[-_])(\d{2})(?:\D|$)", corpus)]
     interpreted = [2000 + y for y in short_years if 0 <= y <= 99]
     if interpreted and max(interpreted) < current - 1:
@@ -201,13 +204,14 @@ def source_uf(source: dict) -> str:
     return ""
 
 
-def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[str]) -> tuple[list[dict], str]:
+def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[str]) -> tuple[list[dict], list[dict], str]:
     r = fetch(source["url"])
     soup = BeautifulSoup(r.text, "html.parser")
     for node in soup(["script", "style", "noscript", "svg"]):
         node.decompose()
     source_host = (urlparse(r.url).hostname or "").casefold()
     out: list[dict] = []
+    decisions: list[dict] = []
     seen: set[str] = set()
 
     for a in soup.find_all("a", href=True):
@@ -231,6 +235,22 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
             continue
         seen.add(href)
         clean_title = title[:240] or parent[:240] or "Novo edital/processo seletivo"
+
+        relevance = evaluate_candidate(clean_title, context, href)
+        if relevance.status != ACCEPTED:
+            decisions.append({
+                "source_id": source["id"],
+                "source": source["label"],
+                "title": clean_title,
+                "url": href,
+                "status": relevance.status,
+                "reason": relevance.reason,
+                "confidence": relevance.confidence,
+                "positive_signals": list(relevance.positive_signals),
+                "negative_signals": list(relevance.negative_signals),
+            })
+            continue
+
         start_date, end_date = parse_dates(context)
         cls = classify(context, end_date)
         if is_stale_candidate(clean_title, context, href, cls["status"], end_date):
@@ -262,8 +282,10 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
             "start_date": start_date,
             "end_date": end_date,
             "status": cls["status"],
+            "relevance_status": relevance.status,
+            "relevance_confidence": relevance.confidence,
         })
-    return out, r.url
+    return out, decisions, r.url
 
 
 def ensure_label(repo: str, token: str, name: str, color: str, description: str) -> None:
@@ -304,6 +326,7 @@ def main() -> int:
     old = load(STATE, {})
     include_terms = list(cfg.get("include_terms") or [])
     exclude_terms = list(cfg.get("exclude_terms") or [])
+    interest_profile = dict(cfg.get("interest_profile") or {})
     old_items = {x.get("id"): x for x in old.get("items", []) if x.get("id")}
     old_seen = set(old.get("seen_ids", [])) | set(old_items)
     first_run = not bool(old_seen)
@@ -312,20 +335,41 @@ def main() -> int:
     found: dict[str, dict] = {}
     health: list[dict] = []
     failures: list[dict] = []
+    all_decisions: list[dict] = []
+    filtered_interest = 0
     for source in cfg.get("sources", []):
         try:
-            items, final_url = candidate_links(source, include_terms, exclude_terms)
+            items, decisions, final_url = candidate_links(source, include_terms, exclude_terms)
+            all_decisions.extend(decisions)
             for item in items:
+                if not matches_interest_profile(item, interest_profile):
+                    filtered_interest += 1
+                    continue
                 found[item["id"]] = item
-            health.append({"id": source["id"], "label": source["label"], "ok": True, "item_count": len(items), "checked_at": stamp, "url": final_url, "error": ""})
+            health.append({
+                "id": source["id"],
+                "label": source["label"],
+                "ok": True,
+                "item_count": len(items),
+                "checked_at": stamp,
+                "url": final_url,
+                "error": "",
+            })
         except Exception as exc:
             err = str(exc)[:500]
             failures.append({"source": source.get("label"), "error": err})
             health.append({"id": source.get("id", ""), "label": source.get("label", ""), "ok": False, "item_count": 0, "checked_at": stamp, "url": source.get("url", ""), "error": err})
             print(f"[NEW] falha em {source.get('label')}: {exc}")
 
-    # Keep only records still present in the current official-source crawl.
-    # Historical links disappearing from the active page must not live forever in the app.
+    diagnostics = {
+        "schema_version": 1,
+        "updated_at": stamp,
+        "counts": dict(Counter(d["status"] for d in all_decisions)),
+        "filtered_interest_count": filtered_interest,
+        "items": all_decisions[-1000:],
+    }
+    save(DIAGNOSTICS, diagnostics)
+
     merged: dict[str, dict] = {}
     for item_id, item in found.items():
         previous = old_items.get(item_id, {})
@@ -343,12 +387,13 @@ def main() -> int:
     max_seen = int(cfg.get("max_seen_urls") or 5000)
 
     state = {
-        "schema_version": 2,
+        "schema_version": 3,
         "updated_at": stamp,
         "first_run_baseline": first_run,
         "source_count": len(cfg.get("sources", [])),
         "healthy_source_count": sum(1 for h in health if h["ok"]),
         "new_count": 0 if first_run else len(new_items),
+        "filtered_interest_count": filtered_interest,
         "items": items,
         "seen_ids": seen_ids[-max_seen:],
         "source_health": health,
@@ -366,7 +411,11 @@ def main() -> int:
             except Exception as exc:
                 print(f"[NEW] falha ao criar issue: {exc}")
 
-    print(f"[NEW] fontes={state['source_count']} saudaveis={state['healthy_source_count']} itens={len(items)} novos={state['new_count']} falhas={len(failures)}")
+    print(
+        f"[NEW] fontes={state['source_count']} saudaveis={state['healthy_source_count']} "
+        f"itens={len(items)} novos={state['new_count']} filtrados={filtered_interest} "
+        f"rejeitados={len(all_decisions)} falhas={len(failures)}"
+    )
     return 0
 
 
