@@ -169,6 +169,23 @@ mod tests {
     }
 
     #[test]
+    fn status_labels_are_human_readable() {
+        assert_eq!(status_label("open"), "Inscrições abertas");
+        assert_eq!(status_label("closing_soon"), "Encerra em breve");
+        assert_eq!(status_label("announced"), "Anunciado");
+        assert_eq!(status_label("detected"), "Detectado");
+    }
+
+    #[test]
+    fn headline_reflects_closing_soon_items() {
+        let contests = vec![DashboardContest {
+            status: "closing_soon".into(),
+            ..DashboardContest::default()
+        }];
+        assert_eq!(headline_for_contests(&contests), "1 prazo merece sua atenção");
+    }
+
+    #[test]
     fn rendered_dashboard_has_no_script_tag() {
         let config = DashboardConfig {
             schema_version: 1,
