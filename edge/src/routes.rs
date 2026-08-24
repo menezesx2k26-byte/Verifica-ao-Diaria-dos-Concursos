@@ -71,11 +71,7 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
                 .ok_or(AppError::NotFound)?;
             let db = env.d1("DB").map_err(|_| AppError::Internal)?;
             let item = get_contest(&db, id).await?.ok_or(AppError::NotFound)?;
-            json_response(
-                &item,
-                200,
-                "public, max-age=60, stale-while-revalidate=120",
-            )
+            json_response(&item, 200, "public, max-age=60, stale-while-revalidate=120")
         }
         "alerts" => {
             let db = env.d1("DB").map_err(|_| AppError::Internal)?;
