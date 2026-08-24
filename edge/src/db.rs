@@ -178,10 +178,7 @@ mod runtime {
         Ok(rows.into_iter().map(ContestDto::from).collect())
     }
 
-    pub async fn get_contest(
-        db: &D1Database,
-        id: &str,
-    ) -> Result<Option<ContestDto>, AppError> {
+    pub async fn get_contest(db: &D1Database, id: &str) -> Result<Option<ContestDto>, AppError> {
         let sql = format!(
             "SELECT {CONTEST_FIELDS} FROM contests WHERE active = 1 AND relevance_status = ? AND id = ? LIMIT 1"
         );
