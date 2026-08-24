@@ -1,6 +1,7 @@
-name = "concursos-watch-v4"
+name = "concursos-watch-redundante"
 main = "build/worker/shim.mjs"
 compatibility_date = "2026-08-24"
+workers_dev = true
 
 [build]
 command = "worker-build --release"
@@ -12,6 +13,7 @@ database_id = "00000000-0000-4000-8000-000000000000"
 
 [env.staging]
 name = "concursos-watch-v4-staging"
+workers_dev = true
 
 [[env.staging.d1_databases]]
 binding = "DB"
