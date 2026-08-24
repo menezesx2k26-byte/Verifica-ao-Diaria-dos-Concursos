@@ -1,4 +1,6 @@
-use crate::dashboard::{render_dashboard, DashboardConfig, DashboardContest, DashboardData};
+use crate::dashboard::{
+    headline_for_contests, render_dashboard, DashboardConfig, DashboardContest, DashboardData,
+};
 use crate::db::{get_contest, list_alerts, list_contests, list_sources, load_published_dashboard};
 use crate::error::AppError;
 use crate::models::{ApiEnvelope, ContestFeedDto, ErrorDto, HealthDto};
@@ -175,30 +177,20 @@ async fn build_dashboard_bundle(db: &worker::d1::D1Database) -> Result<Dashboard
         ..ContestFilters::default()
     };
     let contests = list_contests(db, &filters).await?;
-    let urgent = contests
-        .iter()
-        .filter(|contest| contest.status == "closing_soon")
-        .count();
-    let headline = if urgent == 0 {
-        "Tudo sob controle".to_string()
-    } else if urgent == 1 {
-        "1 prazo merece sua atenção".to_string()
-    } else {
-        format!("{urgent} prazos merecem sua atenção")
-    };
+    let dashboard_contests: Vec<DashboardContest> = contests
+        .into_iter()
+        .map(|contest| DashboardContest {
+            id: contest.id,
+            title: contest.title,
+            organization: contest.organization,
+            status: contest.status,
+            registration_end: contest.registration_end,
+            priority: contest.priority,
+        })
+        .collect();
     let data = DashboardData {
-        headline,
-        contests: contests
-            .into_iter()
-            .map(|contest| DashboardContest {
-                id: contest.id,
-                title: contest.title,
-                organization: contest.organization,
-                status: contest.status,
-                registration_end: contest.registration_end,
-                priority: contest.priority,
-            })
-            .collect(),
+        headline: headline_for_contests(&dashboard_contests),
+        contests: dashboard_contests,
     };
     let html = render_dashboard(&config, &data).map_err(|_| AppError::Internal)?;
     let etag = bundle_etag(
