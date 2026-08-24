@@ -62,4 +62,21 @@ mod tests {
         assert_eq!(route_key("GET", "/api/v1/sources"), "sources");
         assert_eq!(route_key("DELETE", "/api/v1/alerts"), "method_not_allowed");
     }
+
+    #[test]
+    fn dashboard_bundle_routes_are_read_only() {
+        assert_eq!(
+            route_key("GET", "/api/v1/dashboard-manifest"),
+            "dashboard_manifest"
+        );
+        assert_eq!(route_key("GET", "/dashboard"), "dashboard");
+        assert_eq!(
+            route_key("GET", "/assets/dashboard.css"),
+            "dashboard_css"
+        );
+        assert_eq!(
+            route_key("POST", "/dashboard"),
+            "method_not_allowed"
+        );
+    }
 }
