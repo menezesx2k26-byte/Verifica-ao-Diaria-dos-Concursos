@@ -75,10 +75,11 @@ class Snapshot:
 
 
 def build_snapshot(contests_state: dict, priority_state: dict) -> Snapshot:
+    # Fail closed: only records explicitly classified as ACCEPTED may reach D1.
     accepted_by_id = {
         str(item["id"]): dict(item)
         for item in contests_state.get("items", [])
-        if item.get("id") and item.get("relevance_status", "ACCEPTED") == "ACCEPTED"
+        if item.get("id") and item.get("relevance_status") == "ACCEPTED"
     }
     documents = tuple(dict(item) for item in priority_state.get("documents", []) if item.get("id"))
     events = tuple(dict(item) for item in priority_state.get("events", []) if item.get("id"))
