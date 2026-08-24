@@ -5,6 +5,9 @@ pub mod models;
 pub mod query;
 pub mod security;
 
+#[cfg(target_arch = "wasm32")]
+mod routes;
+
 const MUTATING_METHODS: &[&str] = &["POST", "PUT", "PATCH", "DELETE"];
 
 pub fn route_key(method: &str, path: &str) -> &'static str {
@@ -34,6 +37,16 @@ pub fn route_key(method: &str, path: &str) -> &'static str {
         (m, Some(_)) if MUTATING_METHODS.contains(&m) => "method_not_allowed",
         _ => "not_found",
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[worker::event(fetch)]
+pub async fn main(
+    req: worker::Request,
+    env: worker::Env,
+    _ctx: worker::Context,
+) -> worker::Result<worker::Response> {
+    routes::handle(req, env).await
 }
 
 #[cfg(test)]
