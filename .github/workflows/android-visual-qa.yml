@@ -47,13 +47,108 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare validated dashboard fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dashboard-fixture
+          cat > dashboard-fixture/index.html <<'EOF'
+          <!doctype html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Concursos Watch</title>
+            <link rel="stylesheet" href="/assets/dashboard.css">
+          </head>
+          <body>
+            <main class="shell">
+              <header class="masthead">
+                <div>
+                  <p class="eyebrow">CONCURSOS WATCH · V4</p>
+                  <h1>Tem algo que você precisa fazer?</h1>
+                </div>
+                <span class="live">ATUALIZADO</span>
+              </header>
+
+              <section class="hero">
+                <div class="hero-icon">✓</div>
+                <div>
+                  <p class="hero-kicker">ATENÇÃO AGORA</p>
+                  <h2>Nada urgente por enquanto</h2>
+                  <p>Se surgir convocação, nomeação ou prazo importante, ela sobe para o topo.</p>
+                </div>
+                <a class="button" href="concursoswatch://alerts/priority">Ver alertas</a>
+              </section>
+
+              <section>
+                <div class="section-title">
+                  <div><p class="eyebrow">WATCHLIST</p><h2>Acompanhamentos prioritários</h2></div>
+                  <span>3 ativos</span>
+                </div>
+                <div class="watch-grid">
+                  <article class="watch"><span class="dot ok"></span><div><strong>ACS · 004/2024</strong><small>Praia Grande</small></div><b>Normal</b></article>
+                  <article class="watch"><span class="dot ok"></span><div><strong>Assistente-Técnico · 02/2026</strong><small>São Vicente</small></div><b>Normal</b></article>
+                  <article class="watch"><span class="dot ok"></span><div><strong>Professor III · Matemática</strong><small>Praia Grande · 002/2025</small></div><b>Normal</b></article>
+                </div>
+              </section>
+
+              <section>
+                <div class="section-title">
+                  <div><p class="eyebrow">OPORTUNIDADES</p><h2>Inscrições abertas</h2></div>
+                  <span>2 no radar</span>
+                </div>
+                <article class="contest">
+                  <div class="contest-top"><span class="pill">FEDERAL · SC</span><span class="deadline">encerra em breve</span></div>
+                  <h3>Processo seletivo para Professor Visitante</h3>
+                  <p>UFSC · nível superior · Docência</p>
+                  <a href="https://concursos-watch.example.workers.dev/api/v1/contests/ufsc-150-2026">Abrir fonte oficial ↗</a>
+                </article>
+                <article class="contest compact">
+                  <div class="contest-top"><span class="pill">MUNICIPAL · SP</span><span class="deadline neutral">aberto</span></div>
+                  <h3>Processo seletivo em educação</h3>
+                  <p>Praia Grande · processo seletivo</p>
+                </article>
+              </section>
+
+              <footer>Dashboard validado · JavaScript desligado · conteúdo disponível offline</footer>
+            </main>
+          </body>
+          </html>
+          EOF
+
+          cat > dashboard-fixture/dashboard.css <<'EOF'
+          :root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#090b10;color:#f6f7fb}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top right,#19162d 0,#090b10 34%);color:#f6f7fb}.shell{max-width:760px;margin:0 auto;padding:24px 18px 42px}.masthead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px}.eyebrow{margin:0 0 7px;color:#9d8cff;font-size:11px;font-weight:800;letter-spacing:.12em}.masthead h1{margin:0;max-width:540px;font-size:30px;line-height:1.08;letter-spacing:-.04em}.live{border:1px solid #2f2b45;background:#12101d;color:#bcb6d9;border-radius:999px;padding:7px 10px;font-size:9px;font-weight:800;letter-spacing:.08em}.hero{display:grid;grid-template-columns:auto 1fr;gap:14px;border:1px solid #2c2851;background:linear-gradient(145deg,#171527,#11131a);border-radius:26px;padding:19px;box-shadow:0 18px 55px rgba(0,0,0,.28)}.hero-icon{width:43px;height:43px;border-radius:14px;display:grid;place-items:center;background:#14261e;color:#64dc9a;font-size:23px;font-weight:900}.hero-kicker{margin:2px 0 4px;color:#7cdda2;font-size:10px;font-weight:800;letter-spacing:.12em}.hero h2{margin:0;font-size:22px;letter-spacing:-.025em}.hero p:not(.hero-kicker){margin:7px 0 0;color:#aaa9b6;line-height:1.45;font-size:13px}.button{grid-column:1/-1;text-decoration:none;text-align:center;background:#7763f1;color:white;border-radius:14px;padding:12px 16px;font-size:13px;font-weight:800;margin-top:3px}.section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:28px 2px 12px}.section-title h2{margin:0;font-size:19px;letter-spacing:-.02em}.section-title>span{color:#8d8b98;font-size:11px}.watch-grid{display:grid;gap:9px}.watch{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:11px;padding:14px;border:1px solid #20232d;background:#101218;border-radius:18px}.dot{width:10px;height:10px;border-radius:50%}.dot.ok{background:#5bd594;box-shadow:0 0 0 5px rgba(91,213,148,.09)}.watch div{display:grid;gap:3px}.watch strong{font-size:13px}.watch small{color:#7f7e89;font-size:11px}.watch b{color:#65d899;font-size:10px}.contest{border:1px solid #252735;background:#11131a;border-radius:20px;padding:16px;margin-bottom:10px}.contest.compact{opacity:.94}.contest-top{display:flex;justify-content:space-between;gap:10px}.pill{display:inline-flex;border-radius:999px;background:#211d3c;color:#ae9fff;padding:5px 8px;font-size:9px;font-weight:800;letter-spacing:.06em}.deadline{color:#e4aa54;font-size:10px;font-weight:800}.deadline.neutral{color:#6bd9a0}.contest h3{margin:12px 0 6px;font-size:17px;line-height:1.25}.contest p{margin:0;color:#8e8d99;font-size:12px}.contest a{display:inline-block;margin-top:13px;color:#a895ff;text-decoration:none;font-size:12px;font-weight:700}footer{margin-top:28px;padding-top:16px;border-top:1px solid #1e2029;color:#656570;text-align:center;font-size:10px;line-height:1.5}@media(max-width:420px){.shell{padding:18px 14px 34px}.masthead h1{font-size:27px}.live{display:none}.hero{border-radius:22px}}
+          EOF
+
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path('dashboard-fixture')
+          html = (root / 'index.html').read_bytes()
+          css = (root / 'dashboard.css').read_bytes()
+          manifest = {
+              'schema_version': 1,
+              'dashboard_version': 9001,
+              'style_version': 4,
+              'min_app_version': '4.0.0',
+              'published_at': '2026-08-24T12:00:00Z',
+              'html_url': 'https://concursos-watch.example.workers.dev/dashboard',
+              'css_url': 'https://concursos-watch.example.workers.dev/assets/dashboard.css',
+              'html_sha256': hashlib.sha256(html).hexdigest(),
+              'css_sha256': hashlib.sha256(css).hexdigest(),
+              'etag': 'visual-qa-v4-9001',
+          }
+          (root / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False), encoding='utf-8')
+          PY
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Security tests and real app screens
+      - name: Security tests and six real app screens
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -64,39 +159,80 @@ jobs:
             set -eu
             gradle -p android :app:connectedDebugAndroidTest --stacktrace
             mkdir -p visual-qa
+            PKG="com.menezes.concursoswatch.dev"
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell pm grant com.menezes.concursoswatch.dev android.permission.POST_NOTIFICATIONS || true
-            adb shell am force-stop com.menezes.concursoswatch.dev
-            adb shell am start -n com.menezes.concursoswatch.dev/com.menezes.concursoswatch.MainActivity
-            sleep 18
+            adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS || true
 
-            adb exec-out screencap -p > visual-qa/01-home.png
+            # Seed a bundle already validated by the Android contract. WebView itself remains network-isolated.
+            for file in manifest.json index.html dashboard.css; do
+              adb push "dashboard-fixture/$file" "/data/local/tmp/cw-$file" >/dev/null
+              adb shell chmod 644 "/data/local/tmp/cw-$file"
+            done
+            adb shell "run-as $PKG mkdir -p files/dashboard/current"
+            adb shell "run-as $PKG cp /data/local/tmp/cw-manifest.json files/dashboard/current/manifest.json"
+            adb shell "run-as $PKG cp /data/local/tmp/cw-index.html files/dashboard/current/index.html"
+            adb shell "run-as $PKG cp /data/local/tmp/cw-dashboard.css files/dashboard/current/dashboard.css"
+
+            adb shell am force-stop "$PKG"
+            adb shell am start -n "$PKG/com.menezes.concursoswatch.MainActivity"
+            sleep 8
+            adb exec-out screencap -p > visual-qa/01-home-dynamic.png
+
+            # Remove last-known-good and disable connectivity: Home must fall back to Compose, not a broken WebView.
+            adb shell am force-stop "$PKG"
+            adb shell "run-as $PKG rm -rf files/dashboard"
+            adb shell svc wifi disable || true
+            adb shell svc data disable || true
+            adb shell settings put global airplane_mode_on 1 || true
+            adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true >/dev/null || true
+            adb shell am start -n "$PKG/com.menezes.concursoswatch.MainActivity"
+            sleep 6
+            adb exec-out screencap -p > visual-qa/02-home-offline-fallback.png
+
+            adb shell settings put global airplane_mode_on 0 || true
+            adb shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false >/dev/null || true
+            adb shell svc wifi enable || true
+            adb shell svc data enable || true
 
             # Pixel 2 emulator: five equally spaced bottom navigation items.
             adb shell input tap 324 1740
             sleep 2
-            adb exec-out screencap -p > visual-qa/02-alertas.png
+            adb exec-out screencap -p > visual-qa/03-alertas.png
 
             adb shell input tap 540 1740
             sleep 2
-            adb exec-out screencap -p > visual-qa/03-concursos.png
+            adb exec-out screencap -p > visual-qa/04-concursos.png
 
             adb shell input tap 756 1740
             sleep 2
-            adb exec-out screencap -p > visual-qa/04-salvos.png
+            adb exec-out screencap -p > visual-qa/05-salvos.png
 
             adb shell input tap 972 1740
             sleep 2
-            adb exec-out screencap -p > visual-qa/05-ajustes.png
+            adb exec-out screencap -p > visual-qa/06-ajustes.png
 
             adb shell uiautomator dump /sdcard/window.xml || true
             adb pull /sdcard/window.xml visual-qa/window.xml || true
+
+      - name: Assert visual artifacts exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            01-home-dynamic.png \
+            02-home-offline-fallback.png \
+            03-alertas.png \
+            04-concursos.png \
+            05-salvos.png \
+            06-ajustes.png; do
+            test -s "visual-qa/$file"
+          done
 
       - name: Upload visual QA
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ConcursosWatch-v3-visual-qa
+          name: ConcursosWatch-v4-visual-qa
           path: visual-qa/
           if-no-files-found: warn
           retention-days: 14
