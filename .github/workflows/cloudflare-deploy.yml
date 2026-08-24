@@ -1,136 +1,147 @@
-name: Deploy Cloudflare Watch
+name: Deploy Cloudflare Rust Edge
 
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feat/concursos-watch-v3-hardening]
     paths:
-      - "cloudflare/**"
+      - "edge/**"
+      - "cloudflare/schema.sql"
+      - "cloudflare/migrations/**"
+      - "cloudflare/package.json"
+      - "cloudflare/package-lock.json"
+      - "build_edge_wrangler.py"
+      - "ensure_d1_v4.py"
+      - "tests/test_build_edge_wrangler.py"
       - ".github/workflows/cloudflare-deploy.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: concursos-watch-cloudflare-deploy
+  group: concursos-watch-cloudflare-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
-      WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-      NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
-      NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
-      CF_EMAIL_ENABLED: ${{ vars.CF_EMAIL_ENABLED }}
-      CF_EMAIL_FROM: ${{ secrets.CF_EMAIL_FROM }}
-      CF_EMAIL_TO: ${{ secrets.CF_EMAIL_TO }}
-      CF_WORKER_NAME: concursos-watch-redundante
       CF_D1_DATABASE_NAME: concursos-watch
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Preflight de credenciais
-        id: preflight
+      - name: Preflight Cloudflare credentials
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" || -z "$WATCHDOG_TOKEN" ]]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Cloudflare aguardando secrets::Configure CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID e WATCHDOG_TOKEN."
-            exit 0
-          fi
-          echo "ready=true" >> "$GITHUB_OUTPUT"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - uses: actions/setup-node@v4
-        if: steps.preflight.outputs.ready == 'true'
         with:
-          node-version: "20"
+          node-version: "22"
 
-      - name: Instalar Wrangler
-        if: steps.preflight.outputs.ready == 'true'
+      - name: Enable Workers Rust toolchain
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install worker-build --locked
+
+      - name: Install Wrangler
         working-directory: cloudflare
         run: npm install --no-audit --no-fund
 
-      - name: Criar/reutilizar KV e D1 e gerar configuração
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: node scripts/bootstrap.mjs
+      - name: Validate edge config generator
+        run: python -m unittest tests.test_build_edge_wrangler -v
 
-      - name: Preparar secrets do Worker
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: node scripts/secrets.mjs
+      - name: Ensure D1 v4 schema
+        run: python ensure_d1_v4.py
 
-      - name: Aplicar schema idempotente do D1
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: npx wrangler d1 execute "$CF_D1_DATABASE_NAME" --remote --file=./schema.sql --config wrangler.generated.jsonc
+      - name: Resolve live D1 binding
+        run: python build_edge_wrangler.py edge/wrangler.toml edge/wrangler.generated.toml
 
-      - name: Validar configuração antes do deploy
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
+      - name: Rust release checks
+        run: |
+          cargo fmt --manifest-path edge/Cargo.toml --check
+          cargo clippy --manifest-path edge/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path edge/Cargo.toml
+          cargo check --manifest-path edge/Cargo.toml --target wasm32-unknown-unknown
 
-      - name: Implantar Worker, API e Cron Triggers
-        if: steps.preflight.outputs.ready == 'true'
+      - name: Wrangler dry run
         working-directory: cloudflare
-        run: npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
+        run: npx wrangler deploy --dry-run --config ../edge/wrangler.generated.toml
 
-      - name: Descobrir URL pública do Worker
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: node scripts/discover-url.mjs
-
-      - name: Smoke test /health e /api/v1/contests
-        if: steps.preflight.outputs.ready == 'true'
+      - name: Deploy Rust Worker
+        id: deploy
         shell: bash
         run: |
           set -euo pipefail
-          BASE_URL="$(python -c 'import json; print(json.load(open("config/runtime.json"))["cloudflare_url"])')"
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            env_args=()
+          else
+            env_args=(--env staging)
+          fi
+          (cd cloudflare && npx wrangler deploy --config ../edge/wrangler.generated.toml "${env_args[@]}") | tee /tmp/wrangler-deploy.log
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import re
+          text=open('/tmp/wrangler-deploy.log', encoding='utf-8', errors='replace').read()
+          urls=re.findall(r'https://[^\s\x1b]+\.workers\.dev', text)
+          if not urls:
+              raise SystemExit('workers.dev URL not found in Wrangler deploy output')
+          print('url=' + urls[-1].rstrip('/'))
+          PY
+
+      - name: Smoke Rust public read surface
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
           for attempt in 1 2 3 4 5; do
-            if curl --fail --silent --show-error --max-time 15 "$BASE_URL/health" >/dev/null && \
-               curl --fail --silent --show-error --max-time 15 "$BASE_URL/api/v1/contests" >/dev/null; then
-              echo "Cloudflare API operacional: $BASE_URL"
-              exit 0
+            if curl -fsS --max-time 20 "$BASE_URL/health" >/tmp/health.json && \
+               curl -fsS --max-time 20 "$BASE_URL/api/v1/contests?limit=3" >/tmp/contests.json && \
+               curl -fsS --max-time 20 "$BASE_URL/api/v1/dashboard-manifest" >/tmp/manifest.json && \
+               curl -fsS --max-time 20 "$BASE_URL/dashboard" >/tmp/dashboard.html; then
+              break
             fi
             sleep $((attempt * 3))
           done
-          exit 1
+          python - <<'PY'
+          import json
+          contests=json.load(open('/tmp/contests.json', encoding='utf-8'))
+          manifest=json.load(open('/tmp/manifest.json', encoding='utf-8'))
+          assert int(manifest['schema_version']) == 1
+          assert manifest['html_sha256'] and manifest['css_sha256']
+          rows=contests.get('items', [])
+          for row in rows:
+              value=str(row.get('relevance_status', 'ACCEPTED'))
+              assert not value.startswith(('REJECTED_', 'QUARANTINED_'))
+          html=open('/tmp/dashboard.html', encoding='utf-8').read().lower()
+          assert '<script' not in html
+          print('Rust public smoke OK')
+          PY
+          code="$(curl -sS -o /tmp/ingest-body -w '%{http_code}' -X POST "$BASE_URL/api/v1/ingest")"
+          test "$code" = "404"
+          echo "POST /api/v1/ingest -> 404"
 
-      - name: Inicializar baseline e heartbeat Cloudflare
-        if: steps.preflight.outputs.ready == 'true'
+      - name: Record deployed endpoint
         shell: bash
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
         run: |
-          set -euo pipefail
-          BASE_URL="$(python -c 'import json; print(json.load(open("config/runtime.json"))["cloudflare_url"])')"
-          curl --fail --silent --show-error --max-time 90 -X POST "$BASE_URL/run" \
-            -H "Authorization: Bearer $WATCHDOG_TOKEN" -H "Content-Type: application/json"
-          echo
+          {
+            echo "### Rust Edge deployment"
+            echo "- ref: $GITHUB_REF"
+            echo "- endpoint: $BASE_URL"
+            echo "- public writes: disabled"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Persistir URL do Worker no repositório
-        if: steps.preflight.outputs.ready == 'true' && github.ref == 'refs/heads/main'
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ ! -f config/runtime.json ]]; then exit 1; fi
-          if [[ -z "$(git status --porcelain -- config/runtime.json)" ]]; then exit 0; fi
-          git config user.name "concursos-watch[bot]"
-          git config user.email "concursos-watch[bot]@users.noreply.github.com"
-          git add config/runtime.json
-          git commit -m "chore(cloudflare): record deployed worker URL"
-          git pull --rebase origin main
-          git push origin HEAD:main
-
-      - name: Limpar arquivos temporários
+      - name: Clean generated config
         if: always()
-        shell: bash
-        run: rm -f cloudflare/.secrets.generated.json cloudflare/wrangler.generated.jsonc
+        run: rm -f edge/wrangler.generated.toml
