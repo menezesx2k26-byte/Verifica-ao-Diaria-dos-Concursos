@@ -15,8 +15,9 @@ class DashboardConfigTests(unittest.TestCase):
             "style_version": 1,
             "min_app_version": "4.0.0",
             "sections": [
-                {"type": "attention", "title": "Atenção agora", "body": "Nada urgente"},
-                {"type": "open_contests", "title": "Inscrições abertas", "limit": 8},
+                {"type": "attention", "limit": 3},
+                {"type": "priority_watch"},
+                {"type": "open_contests", "limit": 8},
             ],
         }
 
@@ -37,15 +38,17 @@ class DashboardConfigTests(unittest.TestCase):
         validate_dashboard_config(data)
         draft = build_draft_sql(data)
         promote = build_promotion_sql(data["dashboard_version"])
-        self.assertIn("status, config_json", draft)
+        self.assertIn("sections_json, status", draft)
         self.assertIn("'draft'", draft)
         self.assertIn("ON CONFLICT(version) DO UPDATE", draft)
         self.assertTrue(draft.startswith("BEGIN IMMEDIATE;"))
         self.assertTrue(draft.rstrip().endswith("COMMIT;"))
-        self.assertIn("SET status='superseded' WHERE status='published'", promote)
         self.assertIn("SET status='published'", promote)
-        self.assertIn("version=7", promote)
         self.assertIn("status='draft'", promote)
+        self.assertIn("SET status='superseded'", promote)
+        self.assertIn("version<>7", promote)
+        self.assertTrue(promote.startswith("BEGIN IMMEDIATE;"))
+        self.assertTrue(promote.rstrip().endswith("COMMIT;"))
 
     def test_cli_writes_deterministic_sql_files(self):
         from build_dashboard_sql import write_sql_files
