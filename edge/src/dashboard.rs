@@ -182,7 +182,10 @@ mod tests {
             status: "closing_soon".into(),
             ..DashboardContest::default()
         }];
-        assert_eq!(headline_for_contests(&contests), "1 prazo merece sua atenção");
+        assert_eq!(
+            headline_for_contests(&contests),
+            "1 prazo merece sua atenção"
+        );
     }
 
     #[test]
