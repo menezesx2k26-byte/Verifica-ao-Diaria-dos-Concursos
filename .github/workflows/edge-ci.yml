@@ -17,10 +17,31 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Rust format and tests
+
+      - name: Enable Workers WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Rust format, clippy and tests
         run: |
           cargo fmt --manifest-path edge/Cargo.toml --check
+          cargo clippy --manifest-path edge/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path edge/Cargo.toml
+
+      - name: Compile Cloudflare Worker for WASM
+        run: cargo check --manifest-path edge/Cargo.toml --target wasm32-unknown-unknown
+
+      - name: Guard dashboard assets against remote execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          css = Path('edge/assets/dashboard.css').read_text(encoding='utf-8').lower()
+          forbidden = ('@import', 'url(http://', 'url(https://', 'url(//', 'javascript:')
+          for token in forbidden:
+              assert token not in css, f'forbidden dashboard CSS token: {token}'
+          html = Path('edge/src/dashboard.rs').read_text(encoding='utf-8').lower()
+          assert '<script' not in html.replace('&lt;script', ''), 'renderer must not emit script tags'
+          print('dashboard static security guard OK')
+          PY
