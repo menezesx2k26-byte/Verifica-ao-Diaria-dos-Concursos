@@ -63,14 +63,100 @@ def generated_id(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()[:24]
 
 
+_STATUS_RANK = {
+    "closing_soon": 70,
+    "open": 60,
+    "new": 55,
+    "announced": 50,
+    "detected": 40,
+    "tracked": 35,
+    "closed": 10,
+}
+
+
+def _richness(item: dict) -> tuple[int, int, int]:
+    useful = (
+        "title", "organization", "city", "uf", "region", "scope", "type",
+        "education", "area", "remuneration", "vacancies", "fee", "url",
+        "edital_url", "notice_number", "year",
+    )
+    populated = sum(1 for key in useful if item.get(key) not in (None, "", [], {}))
+    text_size = sum(len(str(item.get(key) or "")) for key in useful)
+    return populated, text_size, int(item.get("priority") or 0)
+
+
+def _earliest(values: list[str]) -> str:
+    present = [value for value in values if value]
+    return min(present) if present else ""
+
+
+def _latest(values: list[str]) -> str:
+    present = [value for value in values if value]
+    return max(present) if present else ""
+
+
+def collapse_items(items: list[dict]) -> list[dict]:
+    """Collapse canonical-ID collisions while preserving the richest trustworthy row."""
+    grouped: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for raw in items:
+        item = dict(raw)
+        item_id = str(item.get("id") or "").strip()
+        if not item_id:
+            continue
+        if item_id not in grouped:
+            grouped[item_id] = []
+            order.append(item_id)
+        grouped[item_id].append(item)
+
+    collapsed: list[dict] = []
+    for item_id in order:
+        group = grouped[item_id]
+        base = dict(max(group, key=_richness))
+        base["id"] = item_id
+
+        keys = set().union(*(item.keys() for item in group))
+        for key in keys:
+            if key in {"id", "first_seen", "last_seen", "priority", "status", "active"}:
+                continue
+            candidates = [item.get(key) for item in group if item.get(key) not in (None, "", [], {})]
+            if not candidates:
+                continue
+            current = base.get(key)
+            if current in (None, "", [], {}):
+                base[key] = max(candidates, key=lambda value: len(str(value)))
+            elif isinstance(current, str):
+                richer = max(candidates, key=lambda value: len(str(value)))
+                if len(str(richer)) > len(current):
+                    base[key] = richer
+
+        base["priority"] = max(int(item.get("priority") or 0) for item in group)
+        base["status"] = max(
+            (str(item.get("status") or "detected") for item in group),
+            key=lambda value: _STATUS_RANK.get(value, 0),
+        )
+        base["active"] = any(item.get("active", True) is not False for item in group)
+        base["first_seen"] = _earliest([str(item.get("first_seen") or "") for item in group])
+        base["last_seen"] = _latest([str(item.get("last_seen") or "") for item in group])
+        collapsed.append(base)
+    return collapsed
+
+
+def recalculate_new_count(items: list[dict], previously_seen: set[str]) -> int:
+    current_ids = {str(item.get("id")) for item in items if item.get("id")}
+    return len(current_ids - {str(value) for value in previously_seen})
+
+
 def main() -> int:
     feed = load(FEED, {})
     history = load(HISTORY, {"keys": {}})
     mapping = dict(history.get("keys", {}))
-    current_ids = {str(x.get("id")) for x in feed.get("items", []) if x.get("id")}
+    previous_seen = {str(x) for x in feed.get("seen_ids", []) if x}
     remapped = 0
 
-    for item in feed.get("items", []):
+    remapped_items = []
+    for raw in feed.get("items", []):
+        item = dict(raw)
         key = identity_key(item)
         notice, year = notice_identity(item)
         item["notice_number"] = notice
@@ -81,16 +167,22 @@ def main() -> int:
                 item["id"] = existing
                 remapped += 1
         else:
-            # Preserve existing deployed IDs on first contact; use the canonical identity thereafter.
             mapping[key] = str(item.get("id") or generated_id(key))
             item["id"] = mapping[key]
-        current_ids.add(item["id"])
+        remapped_items.append(item)
 
+    items = collapse_items(remapped_items)
+    current_ids = [str(item.get("id")) for item in items if item.get("id")]
+    feed["items"] = items
+    feed["new_count"] = recalculate_new_count(items, previous_seen)
     feed["schema_version"] = max(3, int(feed.get("schema_version") or 0))
-    feed["seen_ids"] = list(dict.fromkeys([str(x) for x in feed.get("seen_ids", [])] + [str(x.get("id")) for x in feed.get("items", []) if x.get("id")]))[-5000:]
+    feed["seen_ids"] = list(dict.fromkeys([str(x) for x in feed.get("seen_ids", [])] + current_ids))[-5000:]
     save(FEED, feed)
     save(HISTORY, {"schema_version": 1, "keys": mapping})
-    print(f"[IDENTITY] itens={len(feed.get('items', []))} remapeados={remapped} identidades={len(mapping)}")
+    print(
+        f"[IDENTITY] itens={len(items)} remapeados={remapped} "
+        f"identidades={len(mapping)} novos={feed['new_count']}"
+    )
     return 0
 
 
