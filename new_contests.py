@@ -204,6 +204,20 @@ def source_uf(source: dict) -> str:
     return ""
 
 
+def link_context(anchor) -> str:
+    title = " ".join(anchor.stripped_strings).strip()
+    node = anchor.parent
+    hops = 0
+    while node is not None and hops < 4:
+        links = node.find_all("a", href=True)
+        text = re.sub(r"\s+", " ", " ".join(node.stripped_strings)).strip()
+        if len(links) == 1 and len(text) <= 1800:
+            return re.sub(r"\s+", " ", f"{title} {text}").strip()[:1800]
+        node = getattr(node, "parent", None)
+        hops += 1
+    return title[:1800]
+
+
 def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[str]) -> tuple[list[dict], list[dict], str]:
     r = fetch(source["url"])
     soup = BeautifulSoup(r.text, "html.parser")
@@ -220,8 +234,7 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
         if parsed.scheme not in {"http", "https"}:
             continue
         title = " ".join(a.stripped_strings).strip()
-        parent = " ".join(a.parent.stripped_strings).strip() if a.parent else title
-        context = re.sub(r"\s+", " ", f"{title} {parent}").strip()[:1800]
+        context = link_context(a)
         combined = fold(f"{context} {href}")
         if not any(fold(term) in combined for term in include_terms):
             continue
@@ -234,7 +247,7 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
         if href in seen:
             continue
         seen.add(href)
-        clean_title = title[:240] or parent[:240] or "Novo edital/processo seletivo"
+        clean_title = title[:240] or "Novo edital/processo seletivo"
 
         relevance = evaluate_candidate(clean_title, context, href)
         if relevance.status != ACCEPTED:
