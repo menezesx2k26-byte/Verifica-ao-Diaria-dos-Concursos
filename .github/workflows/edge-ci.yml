@@ -1,0 +1,26 @@
+name: Rust Edge CI
+
+on:
+  pull_request:
+    paths:
+      - "edge/**"
+      - ".github/workflows/edge-ci.yml"
+  push:
+    branches: [feat/concursos-watch-v3-hardening]
+    paths:
+      - "edge/**"
+      - ".github/workflows/edge-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust format and tests
+        run: |
+          cargo fmt --manifest-path edge/Cargo.toml --check
+          cargo test --manifest-path edge/Cargo.toml
