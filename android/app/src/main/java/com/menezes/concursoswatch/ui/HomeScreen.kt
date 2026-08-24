@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +44,7 @@ fun HomeScreen(
     onDetail: (Contest) -> Unit,
 ) {
     val s = vm.state
+    val firstSyncPending = s.lastSync == 0L
     val actionable = s.alerts.filter { it.unread && it.priority >= 70 }
     val open = s.contests.filter { it.active && it.status in setOf("open", "closing_soon") }
     val degraded = s.sourceHealth.filterNot { it.ok }
@@ -61,8 +63,10 @@ fun HomeScreen(
 
             OverviewCard(
                 syncing = s.syncing,
+                hasSynced = !firstSyncPending,
                 actionableCount = actionable.size,
                 openCount = open.size,
+                sourceCount = s.sourceCount,
                 degradedCount = degraded.size,
                 lastSync = vm.relativeSync(),
                 onSync = vm::syncNow,
@@ -72,13 +76,17 @@ fun HomeScreen(
         item {
             SectionHeader(
                 title = "Atenção agora",
-                subtitle = if (actionable.isEmpty()) "Nada importante pendente" else "${actionable.size} item(ns) aguardando sua leitura",
+                subtitle = when {
+                    firstSyncPending -> "Confirmando seus acompanhamentos"
+                    actionable.isEmpty() -> "Nada importante pendente"
+                    else -> "${actionable.size} item(ns) aguardando sua leitura"
+                },
                 actionLabel = if (actionable.isNotEmpty()) "Ver todos" else null,
                 onAction = if (actionable.isNotEmpty()) onOpenAlerts else null,
             )
         }
         if (actionable.isEmpty()) {
-            item { CalmStateCard() }
+            item { if (firstSyncPending) WaitingStateCard() else CalmStateCard() }
         } else {
             items(actionable.take(3), key = { it.id }) { a ->
                 AlertCard(a) { vm.markAlertRead(a) }
@@ -88,7 +96,7 @@ fun HomeScreen(
         item {
             SectionHeader(
                 title = "Seus acompanhamentos",
-                subtitle = "Os três processos que ficam sob vigilância reforçada",
+                subtitle = "Os três processos que recebem atenção reforçada",
             )
         }
         item {
@@ -116,18 +124,27 @@ fun HomeScreen(
         item {
             SectionHeader(
                 title = "Inscrições abertas",
-                subtitle = if (open.isEmpty()) "Nenhuma confirmada agora" else "${open.size} oportunidade(s) no radar",
+                subtitle = when {
+                    firstSyncPending -> "Buscando oportunidades nas fontes oficiais"
+                    open.isEmpty() -> "Nenhuma confirmada agora"
+                    else -> "${open.size} oportunidade(s) no radar"
+                },
                 actionLabel = "Ver concursos",
                 onAction = onOpenContests,
             )
         }
         if (open.isEmpty()) {
-            item { EmptyCard("Quando aparecer um edital com inscrição aberta, ele entra aqui automaticamente.") }
+            item {
+                EmptyCard(
+                    if (firstSyncPending) "A primeira busca está em andamento. Os editais encontrados vão aparecer aqui."
+                    else "Quando aparecer um edital com inscrição aberta, ele entra aqui automaticamente.",
+                )
+            }
         } else {
             items(open.take(4), key = { it.id }) { ContestCard(it, vm::toggleFavorite, onDetail) }
         }
 
-        if (degraded.isNotEmpty()) {
+        if (!firstSyncPending && degraded.isNotEmpty()) {
             item {
                 SectionHeader("Monitoramento", "Há fontes que precisam de nova confirmação")
                 MonitorWarningCard(degraded.size)
@@ -139,16 +156,19 @@ fun HomeScreen(
 @Composable
 private fun OverviewCard(
     syncing: Boolean,
+    hasSynced: Boolean,
     actionableCount: Int,
     openCount: Int,
+    sourceCount: Int,
     degradedCount: Int,
     lastSync: String,
     onSync: () -> Unit,
 ) {
     val hasAction = actionableCount > 0
+    val sourceKnown = sourceCount > 0
     val accent = when {
-        hasAction -> AppAmber
-        degradedCount > 0 -> AppAmber
+        syncing || !hasSynced -> AppPurple
+        hasAction || degradedCount > 0 -> AppAmber
         else -> AppGreen
     }
 
@@ -165,7 +185,11 @@ private fun OverviewCard(
                     shape = RoundedCornerShape(16.dp),
                 ) {
                     Icon(
-                        if (hasAction) Icons.Filled.ErrorOutline else Icons.Filled.CheckCircle,
+                        when {
+                            syncing || !hasSynced -> Icons.Filled.Refresh
+                            hasAction || degradedCount > 0 -> Icons.Filled.ErrorOutline
+                            else -> Icons.Filled.CheckCircle
+                        },
                         contentDescription = null,
                         tint = accent,
                         modifier = Modifier.padding(12.dp),
@@ -175,13 +199,19 @@ private fun OverviewCard(
                     Text(
                         when {
                             syncing -> "Atualizando seus concursos…"
+                            !hasSynced -> "Primeira verificação pendente"
                             hasAction -> "Tem coisa nova para você"
                             degradedCount > 0 -> "Tudo calmo, com uma ressalva"
                             else -> "Tudo tranquilo por enquanto"
                         },
                         style = MaterialTheme.typography.titleLarge,
                     )
-                    Text("Última atualização $lastSync", color = AppMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        if (!hasSynced && syncing) "Primeira verificação em andamento" else "Última atualização $lastSync",
+                        color = AppMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
                 }
             }
 
@@ -190,9 +220,22 @@ private fun OverviewCard(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                MetricCard("Alertas", actionableCount.toString(), Modifier.weight(1f), if (actionableCount > 0) AppAmber else AppMuted)
-                MetricCard("Abertos", openCount.toString(), Modifier.weight(1f), AppPurple)
-                MetricCard("Fontes", if (degradedCount == 0) "OK" else "$degradedCount!", Modifier.weight(1f), if (degradedCount == 0) AppGreen else AppAmber)
+                MetricCard("Alertas", if (hasSynced) actionableCount.toString() else "—", Modifier.weight(1f), if (actionableCount > 0) AppAmber else AppMuted)
+                MetricCard("Abertos", if (hasSynced) openCount.toString() else "—", Modifier.weight(1f), AppPurple)
+                MetricCard(
+                    "Fontes",
+                    when {
+                        !sourceKnown -> "—"
+                        degradedCount == 0 -> "OK"
+                        else -> "$degradedCount!"
+                    },
+                    Modifier.weight(1f),
+                    when {
+                        !sourceKnown -> AppMuted
+                        degradedCount == 0 -> AppGreen
+                        else -> AppAmber
+                    },
+                )
             }
 
             FilledTonalButton(
@@ -216,6 +259,24 @@ private fun MetricCard(label: String, value: String, modifier: Modifier, valueCo
         Column(Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
             Text(value, color = valueColor, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Text(label, color = AppMuted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun WaitingStateCard() {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = AppPanel),
+        border = BorderStroke(1.dp, AppPurple.copy(alpha = 0.2f)),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = AppPurple)
+            Column(Modifier.padding(start = 12.dp)) {
+                Text("Conferindo as fontes oficiais", fontWeight = FontWeight.SemiBold)
+                Text("O aplicativo ainda não concluiu a primeira verificação.", color = AppMuted, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
@@ -266,7 +327,7 @@ private fun PriorityWatchCard(
     ) {
         Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(color = accent.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
-                Spacer(Modifier.padding(6.dp).height(8.dp))
+                Spacer(Modifier.size(12.dp))
             }
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(city.uppercase(), color = AppPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp)
