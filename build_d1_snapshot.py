@@ -80,8 +80,8 @@ def build_snapshot(contests_state: dict, priority_state: dict) -> Snapshot:
         for item in contests_state.get("items", [])
         if item.get("id") and item.get("relevance_status", "ACCEPTED") == "ACCEPTED"
     }
-    documents = tuple(dict(item) for item in priority_state.get("documents", []))
-    events = tuple(dict(item) for item in priority_state.get("events", []))
+    documents = tuple(dict(item) for item in priority_state.get("documents", []) if item.get("id"))
+    events = tuple(dict(item) for item in priority_state.get("events", []) if item.get("id"))
     referenced = {
         str(item.get("contest_id"))
         for item in documents + events
@@ -119,7 +119,7 @@ def build_snapshot(contests_state: dict, priority_state: dict) -> Snapshot:
             "created_at": event.get("created_at", stamp),
         }
         for event in priority_state.get("new_events", [])
-        if int(event.get("priority", 0) or 0) >= 75
+        if event.get("id") and int(event.get("priority", 0) or 0) >= 75
     )
 
     return Snapshot(
@@ -144,6 +144,18 @@ def sql_int(value: object, default: int = 0) -> str:
         return str(int(value))
     except (TypeError, ValueError):
         return str(default)
+
+
+def _upsert_sql(table: str, columns: tuple[str, ...], values: tuple[str, ...], conflict: str = "id") -> str:
+    updates = ", ".join(
+        f"{column}=excluded.{column}"
+        for column in columns
+        if column != conflict
+    )
+    return (
+        f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({', '.join(values)}) "
+        f"ON CONFLICT({conflict}) DO UPDATE SET {updates};"
+    )
 
 
 def _contest_sql(item: dict) -> str:
@@ -188,20 +200,109 @@ def _contest_sql(item: dict) -> str:
         sql_text(last_seen),
         sql_text(updated_at),
     )
-    updates = ", ".join(
-        f"{column}=excluded.{column}"
-        for column in columns
-        if column != "id"
+    return _upsert_sql("contests", columns, values)
+
+
+def _document_sql(item: dict) -> str:
+    columns = (
+        "id", "contest_id", "source_id", "kind", "title", "url", "sha256", "published_at",
+        "fetched_at", "text_excerpt", "metadata_json",
+    )
+    metadata = item.get("metadata_json")
+    if metadata is None:
+        metadata = json.dumps(item.get("metadata", {}), ensure_ascii=False, separators=(",", ":"))
+    elif not isinstance(metadata, str):
+        metadata = json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
+    values = (
+        sql_text(item.get("id", "")),
+        sql_text(item.get("contest_id")) if item.get("contest_id") else "NULL",
+        sql_text(item.get("source_id", "")),
+        sql_text(item.get("kind", "")),
+        sql_text(item.get("title", "")),
+        sql_text(item.get("url", "")),
+        sql_text(item.get("sha256", "")),
+        sql_text(item.get("published_at", "")),
+        sql_text(item.get("fetched_at", "")),
+        sql_text(item.get("text_excerpt", "")),
+        sql_text(metadata),
+    )
+    return _upsert_sql("documents", columns, values)
+
+
+def _event_sql(item: dict) -> str:
+    columns = (
+        "id", "contest_id", "source_id", "type", "title", "body", "url", "priority",
+        "happened_at", "created_at", "fingerprint",
+    )
+    values = (
+        sql_text(item.get("id", "")),
+        sql_text(item.get("contest_id")) if item.get("contest_id") else "NULL",
+        sql_text(item.get("source_id", "")),
+        sql_text(item.get("type", "")),
+        sql_text(item.get("title", "")),
+        sql_text(item.get("body", "")),
+        sql_text(item.get("url", "")),
+        sql_int(item.get("priority"), 0),
+        sql_text(item.get("happened_at", "")),
+        sql_text(item.get("created_at", "")),
+        sql_text(item.get("fingerprint", "")),
+    )
+    return _upsert_sql("events", columns, values)
+
+
+def _health_sql(item: dict) -> str:
+    columns = (
+        "id", "label", "url", "http_ok", "parser_ok", "semantic_ok", "item_count", "expected_min",
+        "checked_at", "last_success_at", "fingerprint", "scan_status", "error",
+    )
+    values = (
+        sql_text(item.get("id", "")),
+        sql_text(item.get("label", "")),
+        sql_text(item.get("url", "")),
+        sql_int(item.get("http_ok"), 0),
+        sql_int(item.get("parser_ok"), 0),
+        sql_int(item.get("semantic_ok"), 0),
+        sql_int(item.get("item_count"), 0),
+        sql_int(item.get("expected_min"), 0),
+        sql_text(item.get("checked_at", "")),
+        sql_text(item.get("last_success_at", "")),
+        sql_text(item.get("fingerprint", "")),
+        sql_text(item.get("scan_status", "UNKNOWN")),
+        sql_text(item.get("error", "")),
+    )
+    return _upsert_sql("source_health", columns, values)
+
+
+def _alert_sql(item: dict) -> str | None:
+    event_id = item.get("event_id")
+    if not event_id:
+        return None
+    values = (
+        sql_text(event_id),
+        sql_text(item.get("title", "")),
+        sql_text(item.get("body", "")),
+        sql_text(item.get("url", "")),
+        sql_int(item.get("priority"), 0),
+        sql_text(item.get("created_at", "")),
     )
     return (
-        f"INSERT INTO contests ({', '.join(columns)}) VALUES ({', '.join(values)}) "
-        f"ON CONFLICT(id) DO UPDATE SET {updates};"
+        "INSERT INTO alerts (event_id, title, body, url, priority, created_at) "
+        f"SELECT {', '.join(values)} WHERE NOT EXISTS "
+        f"(SELECT 1 FROM alerts WHERE event_id={sql_text(event_id)});"
     )
 
 
 def write_sql(snapshot: Snapshot, path: Path) -> None:
     lines = ["BEGIN IMMEDIATE;", "UPDATE contests SET active=0;"]
     lines.extend(_contest_sql(item) for item in snapshot.contests if item.get("id"))
+    lines.extend(_document_sql(item) for item in snapshot.documents if item.get("id"))
+    lines.extend(_event_sql(item) for item in snapshot.events if item.get("id"))
+    lines.extend(_health_sql(item) for item in snapshot.source_health if item.get("id"))
+    lines.extend(
+        statement
+        for item in snapshot.alerts
+        if (statement := _alert_sql(item)) is not None
+    )
     lines.append("COMMIT;")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -222,7 +323,8 @@ def main() -> int:
     write_sql(snapshot, output)
     print(
         f"[D1] contests={len(snapshot.contests)} documents={len(snapshot.documents)} "
-        f"events={len(snapshot.events)} health={len(snapshot.source_health)} -> {output}"
+        f"events={len(snapshot.events)} alerts={len(snapshot.alerts)} "
+        f"health={len(snapshot.source_health)} -> {output}"
     )
     return 0
 
