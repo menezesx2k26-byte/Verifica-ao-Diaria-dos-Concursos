@@ -12,6 +12,7 @@ class BuildD1SnapshotTest(unittest.TestCase):
                 {"id": "ok", "title": "Concurso Público", "organization": "Órgão", "relevance_status": "ACCEPTED"},
                 {"id": "bad", "title": "Pregão Eletrônico", "organization": "Órgão", "relevance_status": "REJECTED_PROCUREMENT"},
                 {"id": "uncertain", "title": "Aviso", "organization": "Órgão", "relevance_status": "QUARANTINED_LOW_CONFIDENCE"},
+                {"id": "legacy", "title": "Sem classificação", "organization": "Órgão"},
             ],
             "source_health": [],
         }
