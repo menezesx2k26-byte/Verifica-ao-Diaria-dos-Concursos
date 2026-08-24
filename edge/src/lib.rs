@@ -1,5 +1,10 @@
-pub fn route_key(_method: &str, _path: &str) -> &'static str {
-    "not_implemented"
+pub fn route_key(method: &str, path: &str) -> &'static str {
+    match (method, path) {
+        ("GET", "/health") => "health",
+        ("POST" | "PUT" | "PATCH" | "DELETE", "/health") => "method_not_allowed",
+        (_, "/api/v1/ingest") => "not_found",
+        _ => "not_found",
+    }
 }
 
 #[cfg(test)]
