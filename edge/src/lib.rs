@@ -1,5 +1,6 @@
 pub mod dashboard;
 pub mod db;
+pub mod error;
 pub mod query;
 pub mod security;
 
