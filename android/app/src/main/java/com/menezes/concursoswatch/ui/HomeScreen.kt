@@ -1,6 +1,6 @@
 package com.menezes.concursoswatch.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,16 +14,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,109 +45,254 @@ fun HomeScreen(
     val s = vm.state
     val actionable = s.alerts.filter { it.unread && it.priority >= 70 }
     val open = s.contests.filter { it.active && it.status in setOf("open", "closing_soon") }
-    val healthy = s.sourceHealth.count { it.ok }
     val degraded = s.sourceHealth.filterNot { it.ok }
 
-    LazyColumn(contentPadding = PaddingValues(bottom = 28.dp)) {
+    LazyColumn(contentPadding = PaddingValues(bottom = 30.dp)) {
         item {
-            ScreenHeader("Concursos Watch", "Ação primeiro; telemetria depois") {
+            ScreenHeader("Concursos Watch", "Se tiver algo importante, aparece aqui primeiro") {
                 IconButton(onClick = vm::syncNow, enabled = !s.syncing) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Sincronizar agora", tint = AppPurple)
-                }
-            }
-            SystemStateCard(
-                syncing = s.syncing,
-                hasAction = actionable.isNotEmpty(),
-                healthy = healthy,
-                total = s.sourceCount,
-                lastSync = vm.relativeSync(),
-                onSync = vm::syncNow,
-            )
-            SectionTitle("Atenção agora", if (actionable.isEmpty()) "Nenhuma ação importante pendente" else "${actionable.size} alerta(s) ainda não lido(s)")
-        }
-        if (actionable.isEmpty()) item { EmptyCard("Nada exige ação imediata neste momento.") }
-        else items(actionable.take(4), key = { it.id }) { a -> AlertCard(a) { vm.markAlertRead(a) } }
-
-        item { SectionTitle("Acompanhamentos prioritários", "Saúde semântica das fontes, não apenas HTTP 200") }
-        item { PriorityWatchCard("Praia Grande · ACS 004/2024", s.sourceHealth.filter { it.id.contains("pg_acs") || it.label.contains("ACS 004/2024", true) }) }
-        item { PriorityWatchCard("São Vicente · ATG 02/2026", s.sourceHealth.filter { it.id.contains("sv_atg") || it.label.contains("02/2026", true) }) }
-        item { PriorityWatchCard("Praia Grande · Professor III Matemática", s.sourceHealth.filter { it.id.contains("pg_math") || it.label.contains("Professor III", true) }) }
-
-        item { SectionTitle("Inscrições abertas", "Somente itens ativos do feed canônico") }
-        if (open.isEmpty()) item { EmptyCard("Nenhuma inscrição aberta confirmada no feed atual.") }
-        else items(open.take(5), key = { it.id }) { ContestCard(it, vm::toggleFavorite, onDetail) }
-
-        item {
-            if (degraded.isNotEmpty()) {
-                Card(Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2015))) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Monitor parcialmente degradado", fontWeight = FontWeight.Bold)
-                        Text("${degraded.size} fonte(s) não passaram em HTTP + parser + validação semântica. O app não interpreta isso como ‘sem novidade’. ", color = AppMuted, fontSize = 13.sp)
+                    if (s.syncing) {
+                        CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp, color = AppPurple)
+                    } else {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Atualizar agora", tint = AppPurple)
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = onOpenAlerts) { Text("Ver alertas") }
-                TextButton(onClick = onOpenContests) { Text("Ver concursos") }
+
+            OverviewCard(
+                syncing = s.syncing,
+                actionableCount = actionable.size,
+                openCount = open.size,
+                degradedCount = degraded.size,
+                lastSync = vm.relativeSync(),
+                onSync = vm::syncNow,
+            )
+        }
+
+        item {
+            SectionHeader(
+                title = "Atenção agora",
+                subtitle = if (actionable.isEmpty()) "Nada importante pendente" else "${actionable.size} item(ns) aguardando sua leitura",
+                actionLabel = if (actionable.isNotEmpty()) "Ver todos" else null,
+                onAction = if (actionable.isNotEmpty()) onOpenAlerts else null,
+            )
+        }
+        if (actionable.isEmpty()) {
+            item { CalmStateCard() }
+        } else {
+            items(actionable.take(3), key = { it.id }) { a ->
+                AlertCard(a) { vm.markAlertRead(a) }
+            }
+        }
+
+        item {
+            SectionHeader(
+                title = "Seus acompanhamentos",
+                subtitle = "Os três processos que ficam sob vigilância reforçada",
+            )
+        }
+        item {
+            PriorityWatchCard(
+                "Praia Grande",
+                "ACS · Edital 004/2024",
+                s.sourceHealth.filter { it.id.contains("pg_acs") || it.label.contains("ACS 004/2024", true) },
+            )
+        }
+        item {
+            PriorityWatchCard(
+                "São Vicente",
+                "Assistente-Técnico de Gestão · 02/2026",
+                s.sourceHealth.filter { it.id.contains("sv_atg") || it.label.contains("ATG", true) || it.label.contains("Assistente-Técnico", true) },
+            )
+        }
+        item {
+            PriorityWatchCard(
+                "Praia Grande",
+                "Professor III · Matemática · 002/2025",
+                s.sourceHealth.filter { it.id.contains("pg_math") || it.label.contains("Professor III", true) },
+            )
+        }
+
+        item {
+            SectionHeader(
+                title = "Inscrições abertas",
+                subtitle = if (open.isEmpty()) "Nenhuma confirmada agora" else "${open.size} oportunidade(s) no radar",
+                actionLabel = "Ver concursos",
+                onAction = onOpenContests,
+            )
+        }
+        if (open.isEmpty()) {
+            item { EmptyCard("Quando aparecer um edital com inscrição aberta, ele entra aqui automaticamente.") }
+        } else {
+            items(open.take(4), key = { it.id }) { ContestCard(it, vm::toggleFavorite, onDetail) }
+        }
+
+        if (degraded.isNotEmpty()) {
+            item {
+                SectionHeader("Monitoramento", "Há fontes que precisam de nova confirmação")
+                MonitorWarningCard(degraded.size)
             }
         }
     }
 }
 
 @Composable
-private fun SystemStateCard(syncing: Boolean, hasAction: Boolean, healthy: Int, total: Int, lastSync: String, onSync: () -> Unit) {
-    val color = when {
-        syncing -> AppPurple
-        hasAction -> Color(0xFFFFB74D)
-        total > 0 && healthy < total -> Color(0xFFFFB74D)
+private fun OverviewCard(
+    syncing: Boolean,
+    actionableCount: Int,
+    openCount: Int,
+    degradedCount: Int,
+    lastSync: String,
+    onSync: () -> Unit,
+) {
+    val hasAction = actionableCount > 0
+    val accent = when {
+        hasAction -> AppAmber
+        degradedCount > 0 -> AppAmber
         else -> AppGreen
     }
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp), colors = CardDefaults.cardColors(containerColor = AppPanel), shape = RoundedCornerShape(18.dp)) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (hasAction) Icons.Filled.Error else Icons.Filled.CheckCircle, contentDescription = null, tint = color)
-            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(if (syncing) "Sincronizando…" else if (hasAction) "Há algo para revisar" else "Sem ação imediata", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("Última sincronização $lastSync · fontes válidas $healthy/$total", color = AppMuted, fontSize = 12.sp)
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = AppPanel),
+        border = BorderStroke(1.dp, AppDivider),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    color = accent.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Icon(
+                        if (hasAction) Icons.Filled.ErrorOutline else Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+                Column(Modifier.weight(1f).padding(start = 13.dp)) {
+                    Text(
+                        when {
+                            syncing -> "Atualizando seus concursos…"
+                            hasAction -> "Tem coisa nova para você"
+                            degradedCount > 0 -> "Tudo calmo, com uma ressalva"
+                            else -> "Tudo tranquilo por enquanto"
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text("Última atualização $lastSync", color = AppMuted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+                }
             }
-            Button(onClick = onSync, enabled = !syncing) { Text("Agora") }
+
+            Spacer(Modifier.height(18.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MetricCard("Alertas", actionableCount.toString(), Modifier.weight(1f), if (actionableCount > 0) AppAmber else AppMuted)
+                MetricCard("Abertos", openCount.toString(), Modifier.weight(1f), AppPurple)
+                MetricCard("Fontes", if (degradedCount == 0) "OK" else "$degradedCount!", Modifier.weight(1f), if (degradedCount == 0) AppGreen else AppAmber)
+            }
+
+            FilledTonalButton(
+                onClick = onSync,
+                enabled = !syncing,
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+            ) {
+                Text(if (syncing) "Atualizando…" else "Verificar agora")
+            }
         }
     }
 }
 
 @Composable
-private fun PriorityWatchCard(title: String, sources: List<SourceHealth>) {
+private fun MetricCard(label: String, value: String, modifier: Modifier, valueColor: Color) {
+    Surface(
+        modifier = modifier,
+        color = AppPanel2,
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
+            Text(value, color = valueColor, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            Text(label, color = AppMuted, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun CalmStateCard() {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF101A16)),
+        border = BorderStroke(1.dp, AppGreen.copy(alpha = 0.2f)),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = AppGreen)
+            Column(Modifier.padding(start = 12.dp)) {
+                Text("Nenhuma ação necessária", fontWeight = FontWeight.SemiBold)
+                Text("Você não tem convocação, nomeação ou alerta prioritário sem ler.", color = AppMuted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PriorityWatchCard(
+    city: String,
+    title: String,
+    sources: List<SourceHealth>,
+) {
     val known = sources.isNotEmpty()
     val ok = known && sources.all { it.ok }
+    val warning = known && !ok
+    val accent = when {
+        ok -> AppGreen
+        warning -> AppAmber
+        else -> AppMuted
+    }
     val status = when {
-        !known -> "Ainda sem telemetria"
-        ok -> "Verificação válida"
-        else -> "Verificação inconclusiva"
+        !known -> "Aguardando primeira verificação"
+        ok -> "Monitoramento normal"
+        else -> "Precisa de nova confirmação"
     }
-    val details = when {
-        !known -> "O scanner dedicado ainda não publicou estado para este acompanhamento."
-        ok -> sources.maxByOrNull { it.checkedAt }?.let { "${it.scanStatusLabel()} · ${it.checkedAt}" } ?: status
-        else -> sources.filterNot { it.ok }.joinToString(" · ") { it.error.ifBlank { "fonte/parsing não confirmado" } }.take(260)
-    }
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp), colors = CardDefaults.cardColors(containerColor = AppPanel)) {
-        Column(Modifier.padding(15.dp)) {
-            Text(title, fontWeight = FontWeight.Bold)
-            Text(status, color = if (ok) AppGreen else Color(0xFFFFB74D), fontSize = 13.sp)
-            Text(details, color = AppMuted, fontSize = 12.sp)
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
+        colors = CardDefaults.cardColors(containerColor = AppPanel),
+        border = BorderStroke(1.dp, AppDivider),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(color = accent.copy(alpha = 0.12f), shape = RoundedCornerShape(999.dp)) {
+                Spacer(Modifier.padding(6.dp).height(8.dp))
+            }
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(city.uppercase(), color = AppPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp)
+                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 2.dp))
+                Text(status, color = accent, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+            }
         }
     }
 }
 
-private fun SourceHealth.scanStatusLabel(): String = when {
-    !httpOk -> "fonte indisponível"
-    !parserOk -> "parser falhou"
-    !semanticOk -> "conteúdo esperado não confirmado"
-    else -> "sem mudança acionável confirmada"
-}
-
 @Composable
-private fun SectionTitle(title: String, subtitle: String) {
-    Column(Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-        Text(title, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-        Text(subtitle, color = AppMuted, fontSize = 13.sp)
+private fun MonitorWarningCard(count: Int) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF221B12)),
+        border = BorderStroke(1.dp, AppAmber.copy(alpha = 0.22f)),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("$count fonte(s) não puderam ser confirmadas", fontWeight = FontWeight.SemiBold, color = AppAmber)
+            Text(
+                "Isso não é tratado como ‘sem novidade’. O aplicativo vai tentar novamente nas próximas verificações.",
+                color = AppMuted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 5.dp),
+            )
+        }
     }
 }
