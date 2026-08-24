@@ -16,12 +16,17 @@ sealed interface DashboardManifestResult {
     data class Modified(val manifest: DashboardManifest) : DashboardManifestResult
 }
 
+interface DashboardRemoteClient {
+    suspend fun fetchManifest(etag: String?): DashboardManifestResult
+    suspend fun fetchBundle(manifest: DashboardManifest): DashboardBundle
+}
+
 class DashboardRemoteDataSource(
     private val apiBaseOverride: String? = null,
-) {
+) : DashboardRemoteClient {
     @Volatile private var discoveredApiBase: String? = null
 
-    suspend fun fetchManifest(etag: String?): DashboardManifestResult {
+    override suspend fun fetchManifest(etag: String?): DashboardManifestResult {
         val base = resolveApiBase()
         val result = request(
             url = "$base/api/v1/dashboard-manifest",
@@ -38,7 +43,7 @@ class DashboardRemoteDataSource(
         return DashboardManifestResult.Modified(manifest)
     }
 
-    suspend fun fetchBundle(manifest: DashboardManifest): DashboardBundle {
+    override suspend fun fetchBundle(manifest: DashboardManifest): DashboardBundle {
         validateManifestUrls(manifest)
         val html = request(
             url = manifest.htmlUrl,
