@@ -90,4 +90,26 @@ mod tests {
             Some(&"same-origin")
         );
     }
+
+    #[test]
+    fn manifest_hashes_exact_bundle_bytes() {
+        let html = b"<html>ok</html>";
+        let css = b"body{}";
+        let manifest = build_dashboard_manifest(
+            9,
+            4,
+            "4.0.0",
+            "2026-08-24T09:00:00Z",
+            "/dashboard",
+            "/assets/dashboard.css",
+            html,
+            css,
+        );
+        assert_eq!(manifest.schema_version, 1);
+        assert_eq!(manifest.dashboard_version, 9);
+        assert_eq!(manifest.style_version, 4);
+        assert_eq!(manifest.html_sha256, sha256_hex(html));
+        assert_eq!(manifest.css_sha256, sha256_hex(css));
+        assert_eq!(manifest.etag, bundle_etag(html, css, 9));
+    }
 }
