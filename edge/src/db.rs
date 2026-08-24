@@ -60,6 +60,101 @@ mod runtime {
     const CONTEST_FIELDS: &str = "id, organization, title, city, uf, region, scope, type, education, area, remuneration, vacancies, fee, registration_start, registration_end, status, source, source_url, edital_url, priority, active, first_seen, last_seen, updated_at";
 
     #[derive(Debug, Deserialize)]
+    struct ContestRow {
+        id: String,
+        organization: String,
+        title: String,
+        city: String,
+        uf: String,
+        region: String,
+        scope: String,
+        #[serde(rename = "type")]
+        kind: String,
+        education: String,
+        area: String,
+        remuneration: String,
+        vacancies: String,
+        fee: String,
+        registration_start: String,
+        registration_end: String,
+        status: String,
+        source: String,
+        source_url: String,
+        edital_url: String,
+        priority: i32,
+        active: i32,
+        first_seen: String,
+        last_seen: String,
+        updated_at: String,
+    }
+
+    impl From<ContestRow> for ContestDto {
+        fn from(row: ContestRow) -> Self {
+            Self {
+                id: row.id,
+                organization: row.organization,
+                title: row.title,
+                city: row.city,
+                uf: row.uf,
+                region: row.region,
+                scope: row.scope,
+                kind: row.kind,
+                education: row.education,
+                area: row.area,
+                remuneration: row.remuneration,
+                vacancies: row.vacancies,
+                fee: row.fee,
+                registration_start: row.registration_start,
+                registration_end: row.registration_end,
+                status: row.status,
+                source: row.source,
+                source_url: row.source_url,
+                edital_url: row.edital_url,
+                priority: row.priority,
+                active: row.active != 0,
+                first_seen: row.first_seen,
+                last_seen: row.last_seen,
+                updated_at: row.updated_at,
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct SourceHealthRow {
+        id: String,
+        label: String,
+        url: String,
+        http_ok: i32,
+        parser_ok: i32,
+        semantic_ok: i32,
+        item_count: i32,
+        expected_min: i32,
+        checked_at: String,
+        last_success_at: String,
+        scan_status: String,
+        error: String,
+    }
+
+    impl From<SourceHealthRow> for SourceHealthDto {
+        fn from(row: SourceHealthRow) -> Self {
+            Self {
+                id: row.id,
+                label: row.label,
+                url: row.url,
+                http_ok: row.http_ok != 0,
+                parser_ok: row.parser_ok != 0,
+                semantic_ok: row.semantic_ok != 0,
+                item_count: row.item_count,
+                expected_min: row.expected_min,
+                checked_at: row.checked_at,
+                last_success_at: row.last_success_at,
+                scan_status: row.scan_status,
+                error: row.error,
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize)]
     struct DashboardConfigRow {
         version: i64,
         schema_version: i64,
@@ -79,7 +174,8 @@ mod runtime {
             .bind_refs(params.iter())
             .map_err(|_| AppError::Internal)?;
         let result = statement.all().await.map_err(|_| AppError::Internal)?;
-        result.results().map_err(|_| AppError::Internal)
+        let rows: Vec<ContestRow> = result.results().map_err(|_| AppError::Internal)?;
+        Ok(rows.into_iter().map(ContestDto::from).collect())
     }
 
     pub async fn get_contest(
@@ -90,12 +186,14 @@ mod runtime {
             "SELECT {CONTEST_FIELDS} FROM contests WHERE active = 1 AND relevance_status = ? AND id = ? LIMIT 1"
         );
         let params = ["ACCEPTED".to_string(), id.to_string()];
-        db.prepare(&sql)
+        let row: Option<ContestRow> = db
+            .prepare(&sql)
             .bind_refs(params.iter())
             .map_err(|_| AppError::Internal)?
             .first(None)
             .await
-            .map_err(|_| AppError::Internal)
+            .map_err(|_| AppError::Internal)?;
+        Ok(row.map(ContestDto::from))
     }
 
     pub async fn list_alerts(db: &D1Database) -> Result<Vec<AlertDto>, AppError> {
@@ -117,7 +215,8 @@ mod runtime {
             .all()
             .await
             .map_err(|_| AppError::Internal)?;
-        result.results().map_err(|_| AppError::Internal)
+        let rows: Vec<SourceHealthRow> = result.results().map_err(|_| AppError::Internal)?;
+        Ok(rows.into_iter().map(SourceHealthDto::from).collect())
     }
 
     pub async fn load_published_dashboard(
