@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AlertsScreen(vm: AppViewModel) {
     val alerts = vm.state.alerts
+    val firstSyncPending = vm.state.lastSync == 0L
     val unread = alerts.count { it.unread }
     val urgent = alerts.count { it.unread && it.priority >= 100 }
 
@@ -20,6 +21,7 @@ fun AlertsScreen(vm: AppViewModel) {
             ScreenHeader(
                 title = "Alertas",
                 subtitle = when {
+                    firstSyncPending && vm.state.syncing -> "Conferindo seus acompanhamentos"
                     unread == 0 -> "Tudo lido por aqui"
                     urgent > 0 -> "$urgent alerta(s) prioritário(s) ainda não lido(s)"
                     else -> "$unread atualização(ões) ainda não lida(s)"
@@ -35,7 +37,15 @@ fun AlertsScreen(vm: AppViewModel) {
         }
 
         if (alerts.isEmpty()) {
-            item { EmptyCard("Nenhum alerta importante foi registrado ainda.") }
+            item {
+                EmptyCard(
+                    when {
+                        firstSyncPending && vm.state.syncing -> "Buscando convocações, nomeações e outras mudanças importantes…"
+                        vm.state.alertError != null -> "Não foi possível atualizar os alertas agora. O aplicativo tentará novamente."
+                        else -> "Nenhum alerta importante foi registrado ainda."
+                    },
+                )
+            }
         } else {
             items(alerts, key = { it.id }) { alert ->
                 AlertCard(alert) { vm.markAlertRead(alert) }
