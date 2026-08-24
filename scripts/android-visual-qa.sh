@@ -42,10 +42,12 @@ for file in manifest.json index.html dashboard.css; do
   adb push "$FIXTURE_DIR/$file" "/data/local/tmp/cw-$file" >/dev/null
   adb shell chmod 644 "/data/local/tmp/cw-$file"
 done
-adb shell "run-as $PKG rm -rf files/dashboard && mkdir -p files/dashboard/current"
-adb shell "run-as $PKG cp /data/local/tmp/cw-manifest.json files/dashboard/current/manifest.json"
-adb shell "run-as $PKG cp /data/local/tmp/cw-index.html files/dashboard/current/index.html"
-adb shell "run-as $PKG cp /data/local/tmp/cw-dashboard.css files/dashboard/current/dashboard.css"
+# Keep every filesystem operation inside run-as. A remote `&&` outside the
+# run-as shell would execute the second command as the adb shell user at `/`.
+adb shell "run-as $PKG sh -c 'rm -rf files/dashboard && mkdir -p files/dashboard/current'"
+adb shell "run-as $PKG sh -c 'cp /data/local/tmp/cw-manifest.json files/dashboard/current/manifest.json'"
+adb shell "run-as $PKG sh -c 'cp /data/local/tmp/cw-index.html files/dashboard/current/index.html'"
+adb shell "run-as $PKG sh -c 'cp /data/local/tmp/cw-dashboard.css files/dashboard/current/dashboard.css'"
 
 adb shell am force-stop "$PKG"
 adb shell am start -n "$ACTIVITY"
@@ -54,7 +56,7 @@ adb exec-out screencap -p > visual-qa/01-home-dynamic.png
 
 # No cache + no network must show native Compose fallback, never a broken WebView.
 adb shell am force-stop "$PKG"
-adb shell "run-as $PKG rm -rf files/dashboard"
+adb shell "run-as $PKG sh -c 'rm -rf files/dashboard'"
 adb shell svc wifi disable || true
 adb shell svc data disable || true
 adb shell settings put global airplane_mode_on 1 || true
