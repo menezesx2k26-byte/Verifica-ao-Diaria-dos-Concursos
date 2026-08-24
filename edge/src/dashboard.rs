@@ -103,7 +103,8 @@ fn render_priority_watch(data: &DashboardData) -> String {
         .map(render_contest_card)
         .collect::<String>();
     let body = if cards.is_empty() {
-        "<p class=\"empty\">Nenhuma mudança relevante nos acompanhamentos prioritários.</p>".to_string()
+        "<p class=\"empty\">Nenhuma mudança relevante nos acompanhamentos prioritários.</p>"
+            .to_string()
     } else {
         cards
     };
