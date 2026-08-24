@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "dashboard_version": 1,
+  "style_version": 1,
+  "min_app_version": "4.0.0",
+  "sections": [
+    {"type": "attention", "limit": 3},
+    {"type": "priority_watch"},
+    {"type": "open_contests", "limit": 5}
+  ]
+}
