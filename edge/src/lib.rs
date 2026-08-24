@@ -15,6 +15,9 @@ pub fn route_key(method: &str, path: &str) -> &'static str {
         "/api/v1/contests" => Some("contests"),
         "/api/v1/alerts" => Some("alerts"),
         "/api/v1/sources" => Some("sources"),
+        "/api/v1/dashboard-manifest" => Some("dashboard_manifest"),
+        "/dashboard" => Some("dashboard"),
+        "/assets/dashboard.css" => Some("dashboard_css"),
         _ if path
             .strip_prefix("/api/v1/contests/")
             .is_some_and(|id| !id.is_empty()) =>
