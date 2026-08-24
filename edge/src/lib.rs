@@ -1,3 +1,4 @@
+pub mod db;
 pub mod query;
 
 pub fn route_key(method: &str, path: &str) -> &'static str {
