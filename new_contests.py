@@ -288,6 +288,36 @@ def candidate_links(source: dict, include_terms: list[str], exclude_terms: list[
     return out, decisions, r.url
 
 
+def apply_interest_profile(items: list[dict], profile: dict) -> tuple[list[dict], list[dict]]:
+    matched: list[dict] = []
+    filtered: list[dict] = []
+    for item in items:
+        if matches_interest_profile(item, profile):
+            matched.append(item)
+            continue
+        filtered.append({
+            "source_id": item.get("source_id", ""),
+            "source": item.get("source", ""),
+            "title": item.get("title", ""),
+            "url": item.get("url", ""),
+            "status": "FILTERED_INTEREST_PROFILE",
+            "reason": "concurso válido fora do perfil de interesse atual",
+            "confidence": int(item.get("relevance_confidence", 100)),
+        })
+    return matched, filtered
+
+
+def build_diagnostics(domain_decisions: list[dict], profile_decisions: list[dict], stamp: str) -> dict:
+    combined = [*domain_decisions, *profile_decisions]
+    return {
+        "schema_version": 1,
+        "updated_at": stamp,
+        "counts": dict(Counter(d.get("status", "UNKNOWN") for d in combined)),
+        "filtered_interest_count": len(profile_decisions),
+        "items": combined[-1000:],
+    }
+
+
 def ensure_label(repo: str, token: str, name: str, color: str, description: str) -> None:
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     base = f"https://api.github.com/repos/{repo}"
@@ -335,16 +365,15 @@ def main() -> int:
     found: dict[str, dict] = {}
     health: list[dict] = []
     failures: list[dict] = []
-    all_decisions: list[dict] = []
-    filtered_interest = 0
+    domain_decisions: list[dict] = []
+    profile_decisions: list[dict] = []
     for source in cfg.get("sources", []):
         try:
             items, decisions, final_url = candidate_links(source, include_terms, exclude_terms)
-            all_decisions.extend(decisions)
-            for item in items:
-                if not matches_interest_profile(item, interest_profile):
-                    filtered_interest += 1
-                    continue
+            domain_decisions.extend(decisions)
+            accepted, filtered = apply_interest_profile(items, interest_profile)
+            profile_decisions.extend(filtered)
+            for item in accepted:
                 found[item["id"]] = item
             health.append({
                 "id": source["id"],
@@ -361,13 +390,7 @@ def main() -> int:
             health.append({"id": source.get("id", ""), "label": source.get("label", ""), "ok": False, "item_count": 0, "checked_at": stamp, "url": source.get("url", ""), "error": err})
             print(f"[NEW] falha em {source.get('label')}: {exc}")
 
-    diagnostics = {
-        "schema_version": 1,
-        "updated_at": stamp,
-        "counts": dict(Counter(d["status"] for d in all_decisions)),
-        "filtered_interest_count": filtered_interest,
-        "items": all_decisions[-1000:],
-    }
+    diagnostics = build_diagnostics(domain_decisions, profile_decisions, stamp)
     save(DIAGNOSTICS, diagnostics)
 
     merged: dict[str, dict] = {}
@@ -393,7 +416,7 @@ def main() -> int:
         "source_count": len(cfg.get("sources", [])),
         "healthy_source_count": sum(1 for h in health if h["ok"]),
         "new_count": 0 if first_run else len(new_items),
-        "filtered_interest_count": filtered_interest,
+        "filtered_interest_count": len(profile_decisions),
         "items": items,
         "seen_ids": seen_ids[-max_seen:],
         "source_health": health,
@@ -413,8 +436,8 @@ def main() -> int:
 
     print(
         f"[NEW] fontes={state['source_count']} saudaveis={state['healthy_source_count']} "
-        f"itens={len(items)} novos={state['new_count']} filtrados={filtered_interest} "
-        f"rejeitados={len(all_decisions)} falhas={len(failures)}"
+        f"itens={len(items)} novos={state['new_count']} filtrados={len(profile_decisions)} "
+        f"rejeitados={len(domain_decisions)} falhas={len(failures)}"
     )
     return 0
 
