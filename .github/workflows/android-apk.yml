@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -41,16 +41,16 @@ jobs:
         run: |
           set -o pipefail
           gradle -p android :app:testDebugUnitTest :app:assembleDebug --stacktrace 2>&1 | tee android-build.log
-          cp android/app/build/outputs/apk/debug/app-debug.apk ConcursosWatch-v3.0.0-dev.apk
-          sha256sum ConcursosWatch-v3.0.0-dev.apk > ConcursosWatch-v3.0.0-dev.apk.sha256
+          cp android/app/build/outputs/apk/debug/app-debug.apk ConcursosWatch-v4.0.0-dev.apk
+          sha256sum ConcursosWatch-v4.0.0-dev.apk > ConcursosWatch-v4.0.0-dev.apk.sha256
 
       - uses: actions/upload-artifact@v4
         if: steps.build_debug.outcome == 'success'
         with:
-          name: ConcursosWatch-v3.0.0-dev
+          name: ConcursosWatch-v4.0.0-dev
           path: |
-            ConcursosWatch-v3.0.0-dev.apk
-            ConcursosWatch-v3.0.0-dev.apk.sha256
+            ConcursosWatch-v4.0.0-dev.apk
+            ConcursosWatch-v4.0.0-dev.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -61,13 +61,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="android-v3.0.0-dev"
+          TAG="android-v4.0.0-dev"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" ConcursosWatch-v3.0.0-dev.apk ConcursosWatch-v3.0.0-dev.apk.sha256 --clobber
+            gh release upload "$TAG" ConcursosWatch-v4.0.0-dev.apk ConcursosWatch-v4.0.0-dev.apk.sha256 --clobber
           else
-            gh release create "$TAG" ConcursosWatch-v3.0.0-dev.apk ConcursosWatch-v3.0.0-dev.apk.sha256 \
-              --target "$GITHUB_SHA" --title "Concursos Watch Android v3.0.0 DEV" \
-              --notes "V3: Room, sync atômica, deep links, API D1, saúde semântica, parsers prioritários PDF-aware e UI action-first."
+            gh release create "$TAG" ConcursosWatch-v4.0.0-dev.apk ConcursosWatch-v4.0.0-dev.apk.sha256 \
+              --target "$GITHUB_SHA" --title "Concursos Watch Android v4.0.0 DEV" \
+              --notes "V4: Home dinâmica validada e cacheada localmente, WebView sem JavaScript/rede, API Rust read-only, filtro anti-lixo e fallback nativo offline."
           fi
 
       - name: Prepare production signing
@@ -100,8 +100,8 @@ jobs:
             -PRELEASE_STORE_PASSWORD="$STORE_PASSWORD" \
             -PRELEASE_KEY_ALIAS="$KEY_ALIAS" \
             -PRELEASE_KEY_PASSWORD="$KEY_PASSWORD" --stacktrace
-          cp android/app/build/outputs/apk/release/app-release.apk ConcursosWatch-v3.0.0.apk
-          sha256sum ConcursosWatch-v3.0.0.apk > ConcursosWatch-v3.0.0.apk.sha256
+          cp android/app/build/outputs/apk/release/app-release.apk ConcursosWatch-v4.0.0.apk
+          sha256sum ConcursosWatch-v4.0.0.apk > ConcursosWatch-v4.0.0.apk.sha256
 
       - name: Publish signed production release
         if: steps.signing.outputs.ready == 'true'
@@ -109,9 +109,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          TAG="android-v3.0.0"
+          TAG="android-v4.0.0"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" ConcursosWatch-v3.0.0.apk ConcursosWatch-v3.0.0.apk.sha256 --clobber
+            gh release upload "$TAG" ConcursosWatch-v4.0.0.apk ConcursosWatch-v4.0.0.apk.sha256 --clobber
           else
-            gh release create "$TAG" ConcursosWatch-v3.0.0.apk ConcursosWatch-v3.0.0.apk.sha256 --target "$GITHUB_SHA" --title "Concursos Watch Android v3.0.0" --notes "Release assinada da arquitetura v3."
+            gh release create "$TAG" ConcursosWatch-v4.0.0.apk ConcursosWatch-v4.0.0.apk.sha256 --target "$GITHUB_SHA" --title "Concursos Watch Android v4.0.0" --notes "Release assinada da arquitetura v4 híbrida e read-only."
           fi
