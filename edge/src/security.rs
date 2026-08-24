@@ -153,4 +153,11 @@ mod tests {
         assert_eq!(manifest.css_sha256, sha256_hex(css));
         assert_eq!(manifest.etag, bundle_etag(html, css, 9));
     }
+
+    #[test]
+    fn dashboard_asset_headers_hash_exact_body_bytes() {
+        let body = b"<html><body>conteudo real</body></html>";
+        let headers = dashboard_asset_headers(body, "text/html; charset=utf-8", "\"etag\"");
+        assert_eq!(headers.get("X-Content-SHA256"), Some(&sha256_hex(body)));
+    }
 }
