@@ -70,13 +70,7 @@ mod tests {
             "dashboard_manifest"
         );
         assert_eq!(route_key("GET", "/dashboard"), "dashboard");
-        assert_eq!(
-            route_key("GET", "/assets/dashboard.css"),
-            "dashboard_css"
-        );
-        assert_eq!(
-            route_key("POST", "/dashboard"),
-            "method_not_allowed"
-        );
+        assert_eq!(route_key("GET", "/assets/dashboard.css"), "dashboard_css");
+        assert_eq!(route_key("POST", "/dashboard"), "method_not_allowed");
     }
 }
