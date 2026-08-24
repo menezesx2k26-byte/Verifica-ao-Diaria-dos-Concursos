@@ -11,6 +11,8 @@ on:
       - "deep_audit.py"
       - "search_probe.py"
       - "new_contests.py"
+      - "relevance_filter.py"
+      - "canonicalize_contests.py"
       - "generic_health.py"
       - "priority_scanner.py"
       - "publish_api_snapshot.py"
@@ -41,7 +43,7 @@ jobs:
 
       - name: Validar Python e regressões anti-ruído
         run: |
-          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py new_contests.py generic_health.py priority_scanner.py publish_api_snapshot.py
+          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py priority_scanner.py publish_api_snapshot.py
           python monitor.py --self-test
           python -m unittest discover -s tests -p "test_*.py" -v
           python - <<'PY'
@@ -80,7 +82,21 @@ jobs:
           events = ps.detect_events(watch, "source", "Edital 02/2026 Assistente Técnico de Gestão. Convocação. Gabriel Veloso Menezes.", "https://x", "abc", "2026-08-23T00:00:00Z")
           assert any(e["type"] == "candidate_mention" and e["priority"] == 130 for e in events)
           assert any(e["type"] == "convocation" for e in events)
-          print("v3 regression suite OK")
+          print("v4 regression suite OK")
+          PY
+
+      - name: Relevance anti-noise regression
+        run: |
+          python -m unittest tests.test_relevance_filter tests.test_new_contests -v
+
+      - name: Guard broad contest terms
+        run: |
+          python - <<'PY'
+          import json
+          with open('config/new_contests_sources.json', encoding='utf-8') as f:
+              cfg = json.load(f)
+          terms = [x.casefold().strip() for x in cfg.get('include_terms', [])]
+          assert 'edital' not in terms, 'bare edital must never be a broad positive signal'
           PY
 
       - name: Validar bootstrap PowerShell
