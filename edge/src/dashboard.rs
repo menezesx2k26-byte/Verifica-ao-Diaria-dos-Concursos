@@ -60,6 +60,30 @@ pub fn escape_text(input: &str) -> String {
     out
 }
 
+pub fn status_label(status: &str) -> &str {
+    match status {
+        "open" => "Inscrições abertas",
+        "closing_soon" => "Encerra em breve",
+        "announced" => "Anunciado",
+        "detected" => "Detectado",
+        "tracked" => "Em acompanhamento",
+        "closed" => "Encerrado",
+        _ => status,
+    }
+}
+
+pub fn headline_for_contests(contests: &[DashboardContest]) -> String {
+    let urgent = contests
+        .iter()
+        .filter(|contest| contest.status == "closing_soon")
+        .count();
+    match urgent {
+        0 => "Tudo sob controle".to_string(),
+        1 => "1 prazo merece sua atenção".to_string(),
+        count => format!("{count} prazos merecem sua atenção"),
+    }
+}
+
 fn render_contest_card(contest: &DashboardContest) -> String {
     let deadline = if contest.registration_end.is_empty() {
         "Prazo não informado".to_string()
@@ -70,7 +94,7 @@ fn render_contest_card(contest: &DashboardContest) -> String {
         "<article class=\"contest-card\"><p class=\"eyebrow\">{}</p><h3>{}</h3><p class=\"muted\">{}</p><p class=\"deadline\">{}</p></article>",
         escape_text(&contest.organization),
         escape_text(&contest.title),
-        escape_text(&contest.status),
+        escape_text(status_label(&contest.status)),
         deadline,
     )
 }
