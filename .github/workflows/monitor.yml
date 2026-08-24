@@ -19,10 +19,12 @@ on:
       - "canonicalize_contests.py"
       - "generic_health.py"
       - "priority_scanner.py"
-      - "publish_api_snapshot.py"
+      - "build_d1_snapshot.py"
       - "tests/**"
       - "config/**"
       - "requirements.txt"
+      - "cloudflare/package.json"
+      - "cloudflare/package-lock.json"
       - ".github/workflows/monitor.yml"
   schedule:
     - cron: "7,22,37,52 * * * *"
@@ -54,7 +56,7 @@ jobs:
       - name: Testar parsers, monitor e transportes
         run: |
           python monitor.py --self-test
-          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py priority_scanner.py publish_api_snapshot.py
+          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py priority_scanner.py build_d1_snapshot.py
           python -m unittest discover -s tests -p "test_*.py" -v
 
       - name: Verificar acompanhamentos prioritários existentes
@@ -95,11 +97,44 @@ jobs:
       - name: Validar saúde semântica das fontes amplas
         run: python generic_health.py
 
-      - name: Publicar snapshot canônico no Worker/D1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar Wrangler
+        working-directory: cloudflare
+        run: npm install --no-audit --no-fund
+
+      - name: Gerar snapshot D1 validado
+        run: python build_d1_snapshot.py
+
+      - name: Aplicar snapshot D1 diretamente
+        working-directory: cloudflare
         env:
-          WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler d1 execute concursos-watch --remote --file=../state/d1_snapshot.sql
+
+      - name: Smoke read-only da API pública
+        env:
           CONCURSOS_API_URL: ${{ vars.CONCURSOS_API_URL }}
-        run: python publish_api_snapshot.py
+        run: |
+          set -euo pipefail
+          test -n "$CONCURSOS_API_URL"
+          curl -fsS "$CONCURSOS_API_URL/api/v1/contests?limit=5" > /tmp/contests.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/contests.json', encoding='utf-8'))
+          rows = data.get('items', data if isinstance(data, list) else [])
+          for row in rows:
+              status = str(row.get('relevance_status', 'ACCEPTED'))
+              assert not status.startswith('REJECTED_')
+              assert not status.startswith('QUARANTINED_')
+          print('API read-only smoke OK')
+          PY
 
       - name: Persistir estados apenas quando mudaram
         shell: bash
