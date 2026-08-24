@@ -53,11 +53,13 @@ jobs:
           disable-animations: true
           script: |
             set -eu
+            APP_ID="com.menezes.concursoswatch.dev"
+            ACTIVITY="com.menezes.concursoswatch.MainActivity"
             mkdir -p visual-qa
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell pm grant com.menezes.concursoswatch android.permission.POST_NOTIFICATIONS || true
-            adb shell am force-stop com.menezes.concursoswatch
-            adb shell am start -n com.menezes.concursoswatch/.MainActivity
+            adb shell pm grant "$APP_ID" android.permission.POST_NOTIFICATIONS || true
+            adb shell am force-stop "$APP_ID"
+            adb shell am start -n "$APP_ID/$ACTIVITY"
             sleep 18
 
             adb exec-out screencap -p > visual-qa/01-home.png
