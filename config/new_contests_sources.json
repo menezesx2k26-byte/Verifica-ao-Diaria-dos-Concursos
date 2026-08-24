@@ -34,11 +34,20 @@
     {"id":"trt9_servidores","label":"TRT-9 — Concurso de Servidores","city":"Paraná","region":"PR","scope":"federal","priority":85,"url":"https://www.trt9.jus.br/portal/pagina.xhtml?pagina=CONCURSO_SERVIDOR_2022&secao=12"}
   ],
   "include_terms": [
-    "concurso público","concurso publico","processo seletivo","processo simplificado","processo seletivo simplificado","professor substituto","professor temporário","professor temporario","técnico-administrativo","tecnico-administrativo","técnico administrativo","tecnico administrativo","seleção de estagiários","selecao de estagiarios","estágio","estagio","residência","residencia","inscrições abertas","inscricoes abertas","edital de abertura","abertura de inscrições","abertura de inscricoes","novo edital","edital"
+    "concurso público","concurso publico","processo seletivo","processo simplificado","processo seletivo simplificado","professor substituto","professor temporário","professor temporario","técnico-administrativo","tecnico-administrativo","técnico administrativo","tecnico administrativo","seleção de estagiários","selecao de estagiarios","estágio","estagio","residência","residencia","inscrições abertas","inscricoes abertas","edital de abertura","abertura de inscrições","abertura de inscricoes","novo edital"
   ],
   "exclude_terms": [
     "convocação","convocacao","nomeação","nomeacao","posse","resultado","classificação","classificacao","homologação","homologacao","desclassificação","desclassificacao","gabarito","recurso","isenção","isencao","prova física","prova fisica","heteroidentificação","heteroidentificacao","resultado preliminar","resultado definitivo","local de prova","lista de inscritos"
   ],
+  "interest_profile": {
+    "scope": [],
+    "regions": [],
+    "education": [],
+    "areas": [],
+    "types": [],
+    "include_keywords": [],
+    "exclude_keywords": []
+  },
   "max_items": 300,
   "max_seen_urls": 8000
 }
