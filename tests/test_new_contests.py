@@ -1,5 +1,7 @@
 import unittest
 from datetime import date
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import new_contests as nc
 
@@ -37,6 +39,29 @@ class NewContestsParserTests(unittest.TestCase):
     def test_current_open_entry_is_not_stale(self):
         year = date.today().year
         self.assertFalse(nc.is_stale_candidate(f"Edital 10/{str(year)[-2:]}", "inscrições abertas", f"https://org.gov.br/edital-{year}", "open", ""))
+
+    def test_candidate_pipeline_drops_procurement(self):
+        html = """<main>
+          <a href="/transparencia/licitacoes/pregao/55">AVISO PUBLICAÇÃO DE EDITAL - PREGÃO ELETRÔNICO nº 55/2026</a>
+          <a href="/concursos/42">Concurso público para técnico administrativo - Edital 42/2026</a>
+        </main>"""
+        source = {
+            "id": "example",
+            "label": "Example — Concursos",
+            "url": "https://example.gov.br/concursos",
+            "city": "Teste",
+            "region": "SC",
+            "scope": "federal",
+            "priority": 50,
+        }
+        fake = SimpleNamespace(text=html, url=source["url"])
+        with patch.object(nc, "fetch", return_value=fake):
+            items, decisions, _ = nc.candidate_links(source, ["edital", "concurso publico"], [])
+        self.assertEqual(
+            [x["title"] for x in items],
+            ["Concurso público para técnico administrativo - Edital 42/2026"],
+        )
+        self.assertTrue(any(d["status"] == "REJECTED_PROCUREMENT" for d in decisions))
 
 
 if __name__ == "__main__":
