@@ -20,11 +20,14 @@ on:
       - "generic_health.py"
       - "priority_scanner.py"
       - "build_d1_snapshot.py"
+      - "ensure_d1_v4.py"
       - "tests/**"
       - "config/**"
       - "requirements.txt"
       - "cloudflare/package.json"
       - "cloudflare/package-lock.json"
+      - "cloudflare/schema.sql"
+      - "cloudflare/migrations/**"
       - ".github/workflows/monitor.yml"
   schedule:
     - cron: "7,22,37,52 * * * *"
@@ -56,7 +59,7 @@ jobs:
       - name: Testar parsers, monitor e transportes
         run: |
           python monitor.py --self-test
-          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py priority_scanner.py build_d1_snapshot.py
+          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py priority_scanner.py build_d1_snapshot.py ensure_d1_v4.py
           python -m unittest discover -s tests -p "test_*.py" -v
 
       - name: Verificar acompanhamentos prioritários existentes
@@ -105,6 +108,13 @@ jobs:
         working-directory: cloudflare
         run: npm install --no-audit --no-fund
 
+      - name: Garantir schema D1 v4 antes de escrever
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_D1_DATABASE_NAME: concursos-watch
+        run: python ensure_d1_v4.py
+
       - name: Gerar snapshot D1 validado
         run: python build_d1_snapshot.py
 
@@ -113,10 +123,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          npx wrangler d1 execute concursos-watch --remote --file=../state/d1_snapshot.sql
+        run: npx wrangler d1 execute concursos-watch --remote --file=../state/d1_snapshot.sql
 
       - name: Smoke read-only da API pública
         env:
