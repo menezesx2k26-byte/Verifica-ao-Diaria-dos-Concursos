@@ -93,9 +93,9 @@
     "last_attempt_ok": true
   },
   "pg_concursos_004_2024": {
-    "failures": 0,
+    "failures": 1,
     "resolved_url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187",
-    "last_status": 200,
+    "last_status": null,
     "context_sigs": [],
     "context_count": 0,
     "document_urls": [],
@@ -103,8 +103,9 @@
     "parser_version": 4,
     "transport": "direct",
     "last_ok": "2026-08-24T13:29:24+00:00",
-    "last_attempt_ok": true,
-    "last_error": "falha ao buscar https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187: HTTPSConnectionPool(host='www.praiagrande.sp.gov.br', port=443): Max retries exceeded with url: /administracao/concurso_publico.asp?cd_pagina=187 (Caused by ConnectTimeoutError(<HTTPSConnection(host='www.praiagrande.sp.gov.br', port=443) at 0x7f007b361d90>, 'Connection to www.praiagrande.sp.gov.br timed out. (connect timeout=25)'))"
+    "last_attempt_ok": false,
+    "last_error": "falha ao buscar https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187: HTTPSConnectionPool(host='www.praiagrande.sp.gov.br', port=443): Max retries exceeded with url: /administracao/concurso_publico.asp?cd_pagina=187 (Caused by ConnectTimeoutError(<HTTPSConnection(host='www.praiagrande.sp.gov.br', port=443) at 0x7fd2a9735d00>, 'Connection to www.praiagrande.sp.gov.br timed out. (connect timeout=25)'))",
+    "last_failure": "2026-08-24T21:42:10+00:00"
   },
   "pg_diario": {
     "failures": 0,
