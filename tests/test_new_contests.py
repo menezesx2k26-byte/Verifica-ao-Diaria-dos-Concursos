@@ -63,6 +63,37 @@ class NewContestsParserTests(unittest.TestCase):
         )
         self.assertTrue(any(d["status"] == "REJECTED_PROCUREMENT" for d in decisions))
 
+    def test_apply_interest_profile_keeps_domain_validity_separate(self):
+        items = [{
+            "id": "1",
+            "source_id": "ufsc",
+            "source": "UFSC",
+            "title": "Processo seletivo para professor de odontologia",
+            "url": "https://concursos.ufsc.br/1",
+            "scope": "federal",
+            "region": "SC",
+            "uf": "SC",
+            "education": "nível superior",
+            "area": "Docência",
+            "type": "processo seletivo",
+            "relevance_status": "ACCEPTED",
+            "relevance_confidence": 98,
+        }]
+        profile = {"exclude_keywords": ["odontologia"]}
+        matched, filtered = nc.apply_interest_profile(items, profile)
+        self.assertEqual(matched, [])
+        self.assertEqual(filtered[0]["status"], "FILTERED_INTEREST_PROFILE")
+        self.assertEqual(items[0]["relevance_status"], "ACCEPTED")
+
+    def test_build_diagnostics_counts_domain_and_profile_decisions(self):
+        domain = [{"status": "REJECTED_PROCUREMENT", "title": "Pregão"}]
+        profile = [{"status": "FILTERED_INTEREST_PROFILE", "title": "Odontologia"}]
+        result = nc.build_diagnostics(domain, profile, "2026-08-24T00:00:00+00:00")
+        self.assertEqual(result["schema_version"], 1)
+        self.assertEqual(result["counts"]["REJECTED_PROCUREMENT"], 1)
+        self.assertEqual(result["counts"]["FILTERED_INTEREST_PROFILE"], 1)
+        self.assertEqual(len(result["items"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
