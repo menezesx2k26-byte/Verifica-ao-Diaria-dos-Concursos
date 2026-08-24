@@ -1,64 +1,81 @@
-# Verificação redundante dos concursos
+# Concursos Watch v4
 
-Monitor externo focado nos acompanhamentos prioritários de concursos e oportunidades públicas do Gabriel.
+Monitor e aplicativo Android para concursos e oportunidades públicas, com filtragem fail-closed e Home dinâmica segura.
 
 ## Arquitetura
 
 ```text
 Fontes oficiais
    │
-   ├── GitHub Actions — parser profundo + PDFs (~15 min)
-   │      ├── Telegram
-   │      ├── ntfy
-   │      ├── Resend / e-mail
-   │      └── Gmail SMTP
+   v
+Python collectors / parsers / PDFs
    │
-   ├── Cloudflare Worker — detector independente + KV (~15 min, intercalado)
-   │      ├── Telegram
-   │      ├── ntfy
-   │      └── Cloudflare Email Service (opcional)
+   ├── rejeitados e quarentena -> diagnóstico interno
    │
-   └── ChatGPT Watch — terceira pesquisa independente
-
-GitHub ── heartbeat autenticado ──> Cloudflare KV
-GitHub <──────── /health ───────── Cloudflare
+   v
+snapshot com relevance_status = ACCEPTED
+   │
+   v
+GitHub Actions -> SQL validado -> Cloudflare D1
+   │
+   v
+Rust Worker/WASM read-only
+   │
+   ├── /api/v1/contests
+   ├── /api/v1/alerts
+   ├── /api/v1/sources
+   ├── /api/v1/dashboard-manifest
+   ├── /dashboard
+   └── /assets/dashboard.css
+   │
+   v
+Android v4
+   ├── Room + Alertas/Concursos/Salvos/Ajustes nativos
+   └── Home HTML/CSS validada e carregada localmente, sem JS/rede na WebView
 ```
 
-A camada GitHub lê novos PDFs quando possível e alerta também quando um documento fortemente relacionado não pôde ser extraído. A camada Cloudflare usa outro scheduler, outro estado e outro algoritmo de matching. Uma fonte que falha repetidamente também vira evento.
+Python não atende tráfego público e o Worker Rust não possui endpoint público de escrita. A publicação operacional é feita somente pelo GitHub Actions usando uma credencial Cloudflare restrita.
 
-## Fontes monitoradas
+## Anti-ruído
 
-### São Vicente
-- página oficial do Concurso nº 02/2026;
-- IBAM/SP do Concurso nº 02/2026;
-- área oficial de convocações de 2026;
-- Boletim Oficial do Município.
+O pipeline rejeita licitação, pregão, compras públicas e navegação institucional antes da publicação. `edital` isolado não conta como sinal positivo de recrutamento. Itens ambíguos ficam em quarentena e somente registros explicitamente marcados como `ACCEPTED` podem chegar ao D1 público.
 
-### Praia Grande
-- página oficial de concursos e processos seletivos;
-- Diário Oficial Eletrônico (DIOENET/Plenus).
+A watchlist prioritária usa IDs canônicos e parsers dedicados; ela não depende da busca ampla para continuar sendo acompanhada.
 
-### PGFN — estágio nacional 2026
-- página oficial da 1ª Seleção Nacional de Estagiários da PGFN;
-- página do processo de graduação no CIEE;
-- monitor separado em `PGFN Estágio Watch`, executado a cada 15 minutos;
-- foco em regras da prova online: consulta, materiais externos, IA/ferramentas externas, troca de abas, tempo, desconexão, fiscalização, eliminação e retificações;
-- estado independente em `state/pgfn.json`, evitando misturar alterações da PGFN com os concursos prioritários;
-- alertas usam os canais externos já configurados no repositório; GitHub Issue não é tratado como canal principal.
+## Dashboard dinâmico
 
-## Segurança e prioridade pessoal
+Somente a Home é dinâmica. O servidor escolhe conteúdo e composição dentro de um contrato declarativo conhecido. Não há JavaScript remoto nem HTML arbitrário vindo de scraper.
 
-Dados pessoais e tokens **não ficam no repositório público**. Nome, número de inscrição ou outros identificadores podem ser cadastrados no secret `WATCH_PRIORITY_TERMS`; se encontrados nas fontes monitoradas, o evento é elevado para prioridade.
+O Android baixa manifest, HTML e CSS por HTTP nativo, valida host HTTPS, schema, versão mínima, MIME, tamanho e SHA-256 e só então promove o bundle para `last_known_good`. A WebView renderiza uma origem local controlada com JavaScript, DOM storage, file/content access e network loads desativados.
 
-## Autoverificação
+## Versionamento
 
-- GitHub e Cloudflare trocam heartbeat e acusam a ausência um do outro;
-- há alerta de recuperação quando o serviço volta;
-- cada infraestrutura envia um heartbeat diário de saúde depois das 09:00 de São Paulo quando há canal externo configurado;
-- CI valida parser Python, JSON, Worker e `wrangler deploy --dry-run` antes de mudanças relevantes chegarem ao `main`.
+- APK: `4.x.y`, com `versionCode` crescente quando a capacidade nativa muda.
+- Dashboard: `schema_version`, `dashboard_version` e `style_version` independentes do APK.
 
-## Implantação
+Alterações seguras de conteúdo/ordem/estilo da Home não exigem recompilar o aplicativo.
 
-A Cloudflare pode ser provisionada pelo próprio GitHub Actions: o workflow cria/reutiliza KV, injeta o binding, envia secrets, faz dry-run, deploy, inicializa baseline, testa `/health` e grava a URL do Worker em `config/runtime.json`.
+## CI e release gates
 
-Veja o passo a passo e a lista de secrets em [`docs/SETUP.md`](docs/SETUP.md).
+Antes de merge/deploy são exigidos:
+
+- testes Python e fixtures anti-licitação;
+- geração idempotente do snapshot D1;
+- Rust fmt + Clippy + testes + WASM;
+- smoke do Worker com D1 local via Wrangler;
+- validação HTML/CSS/CSP;
+- build e testes Android;
+- Android Visual QA com Home dinâmica e fallback offline;
+- Dashboard Visual QA com JavaScript desativado;
+- smoke remoto do Rust staging antes do cutover de produção.
+
+## Cloudflare
+
+O staging/produção precisa destes GitHub Secrets no próprio repositório:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+O token deve ter apenas as permissões necessárias para D1 e Workers da conta usada pelo Concursos Watch. Não coloque token, account ID privado ou credencial no APK/repositório.
+
+Veja [`docs/SETUP.md`](docs/SETUP.md) para o fluxo operacional completo.
