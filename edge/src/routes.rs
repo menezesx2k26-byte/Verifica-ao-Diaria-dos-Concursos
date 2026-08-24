@@ -5,7 +5,7 @@ use crate::models::{ApiEnvelope, ContestFeedDto, ErrorDto, HealthDto};
 use crate::query::ContestFilters;
 use crate::route_key;
 use crate::security::{
-    build_dashboard_manifest, bundle_etag, dashboard_security_headers, sha256_hex,
+    build_dashboard_manifest, bundle_etag, dashboard_asset_headers, dashboard_security_headers,
     DashboardManifestInput,
 };
 use serde::Serialize;
@@ -99,7 +99,12 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
                 return not_modified(&bundle.etag, true);
             }
             let mut response = Response::from_html(&bundle.html).map_err(|_| AppError::Internal)?;
-            apply_dashboard_headers(&mut response, &bundle.etag, "text/html; charset=utf-8")?;
+            apply_dashboard_headers(
+                &mut response,
+                bundle.html.as_bytes(),
+                &bundle.etag,
+                "text/html; charset=utf-8",
+            )?;
             Ok(response)
         }
         "dashboard_css" => {
@@ -109,7 +114,12 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
                 return not_modified(&bundle.etag, true);
             }
             let mut response = Response::ok(bundle.css).map_err(|_| AppError::Internal)?;
-            apply_dashboard_headers(&mut response, &bundle.etag, "text/css; charset=utf-8")?;
+            apply_dashboard_headers(
+                &mut response,
+                bundle.css.as_bytes(),
+                &bundle.etag,
+                "text/css; charset=utf-8",
+            )?;
             Ok(response)
         }
         "dashboard_manifest" => {
@@ -235,42 +245,17 @@ fn apply_common_headers(response: &mut Response, cache_control: &str) -> Result<
 
 fn apply_dashboard_headers(
     response: &mut Response,
+    body: &[u8],
     etag: &str,
     content_type: &str,
 ) -> Result<(), AppError> {
-    for (name, value) in dashboard_security_headers() {
+    for (name, value) in dashboard_asset_headers(body, content_type, etag) {
         response
             .headers_mut()
-            .set(name, value)
+            .set(name, &value)
             .map_err(|_| AppError::Internal)?;
     }
-    response
-        .headers_mut()
-        .set("Content-Type", content_type)
-        .map_err(|_| AppError::Internal)?;
-    response
-        .headers_mut()
-        .set(
-            "Cache-Control",
-            "public, max-age=300, stale-while-revalidate=3600",
-        )
-        .map_err(|_| AppError::Internal)?;
-    response
-        .headers_mut()
-        .set("ETag", etag)
-        .map_err(|_| AppError::Internal)?;
-    response
-        .headers_mut()
-        .set(
-            "X-Content-SHA256",
-            &sha256_hex(response_body_marker(content_type)),
-        )
-        .map_err(|_| AppError::Internal)?;
     Ok(())
-}
-
-fn response_body_marker(content_type: &str) -> &[u8] {
-    content_type.as_bytes()
 }
 
 fn etag_matches(req: &Request, etag: &str) -> Result<bool, AppError> {
