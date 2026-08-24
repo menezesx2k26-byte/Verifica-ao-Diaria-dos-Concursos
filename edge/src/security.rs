@@ -16,6 +16,17 @@ pub struct DashboardManifest {
     pub etag: String,
 }
 
+pub struct DashboardManifestInput<'a> {
+    pub dashboard_version: u64,
+    pub style_version: u64,
+    pub min_app_version: &'a str,
+    pub published_at: &'a str,
+    pub html_url: &'a str,
+    pub css_url: &'a str,
+    pub html: &'a [u8],
+    pub css: &'a [u8],
+}
+
 pub fn dashboard_csp() -> &'static str {
     "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; script-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; base-uri 'none';"
 }
@@ -48,27 +59,18 @@ pub fn bundle_etag(html: &[u8], css: &[u8], dashboard_version: u64) -> String {
     value
 }
 
-pub fn build_dashboard_manifest(
-    dashboard_version: u64,
-    style_version: u64,
-    min_app_version: &str,
-    published_at: &str,
-    html_url: &str,
-    css_url: &str,
-    html: &[u8],
-    css: &[u8],
-) -> DashboardManifest {
+pub fn build_dashboard_manifest(input: DashboardManifestInput<'_>) -> DashboardManifest {
     DashboardManifest {
         schema_version: 1,
-        dashboard_version,
-        style_version,
-        min_app_version: min_app_version.to_owned(),
-        published_at: published_at.to_owned(),
-        html_url: html_url.to_owned(),
-        css_url: css_url.to_owned(),
-        html_sha256: sha256_hex(html),
-        css_sha256: sha256_hex(css),
-        etag: bundle_etag(html, css, dashboard_version),
+        dashboard_version: input.dashboard_version,
+        style_version: input.style_version,
+        min_app_version: input.min_app_version.to_owned(),
+        published_at: input.published_at.to_owned(),
+        html_url: input.html_url.to_owned(),
+        css_url: input.css_url.to_owned(),
+        html_sha256: sha256_hex(input.html),
+        css_sha256: sha256_hex(input.css),
+        etag: bundle_etag(input.html, input.css, input.dashboard_version),
     }
 }
 
@@ -134,16 +136,16 @@ mod tests {
     fn manifest_hashes_exact_bundle_bytes() {
         let html = b"<html>ok</html>";
         let css = b"body{}";
-        let manifest = build_dashboard_manifest(
-            9,
-            4,
-            "4.0.0",
-            "2026-08-24T09:00:00Z",
-            "/dashboard",
-            "/assets/dashboard.css",
+        let manifest = build_dashboard_manifest(DashboardManifestInput {
+            dashboard_version: 9,
+            style_version: 4,
+            min_app_version: "4.0.0",
+            published_at: "2026-08-24T09:00:00Z",
+            html_url: "/dashboard",
+            css_url: "/assets/dashboard.css",
             html,
             css,
-        );
+        });
         assert_eq!(manifest.schema_version, 1);
         assert_eq!(manifest.dashboard_version, 9);
         assert_eq!(manifest.style_version, 4);
