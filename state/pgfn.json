@@ -62,8 +62,9 @@
     "document_urls": [],
     "document_count": 0,
     "transport": "direct",
-    "last_ok": "2026-08-23T19:00:47+00:00",
-    "last_attempt_ok": true
+    "last_ok": "2026-08-24T10:08:15+00:00",
+    "last_attempt_ok": true,
+    "last_error": "falha ao buscar https://www.gov.br/pgfn/pt-br/assuntos/noticias/2026/selecao-nacional-de-estagiarios: HTTPSConnectionPool(host='www.gov.br', port=443): Max retries exceeded with url: /pgfn/pt-br/assuntos/noticias/2026/selecao-nacional-de-estagiarios (Caused by NewConnectionError(\"HTTPSConnection(host='www.gov.br', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable\"))"
   },
   "ciee_pgfn_17291": {
     "failures": 0,
