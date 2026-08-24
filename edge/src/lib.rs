@@ -1,6 +1,7 @@
 pub mod dashboard;
 pub mod db;
 pub mod query;
+pub mod security;
 
 const MUTATING_METHODS: &[&str] = &["POST", "PUT", "PATCH", "DELETE"];
 
