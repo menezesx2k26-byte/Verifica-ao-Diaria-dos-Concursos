@@ -1,0 +1,12 @@
+[package]
+name = "concursos-watch-edge"
+version = "4.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+[dev-dependencies]
+pretty_assertions = "1"
