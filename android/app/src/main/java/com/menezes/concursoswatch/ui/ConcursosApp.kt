@@ -52,14 +52,18 @@ fun ConcursosApp(
             NavItem("settings", "Ajustes", Icons.Filled.Settings),
         )
 
-        LaunchedEffect(initialUri) {
-            val uri = initialUri?.let(Uri::parse) ?: return@LaunchedEffect
+        val navigateNativeUri: (Uri) -> Unit = { uri ->
             when (uri.host) {
                 "contest" -> uri.lastPathSegment?.takeIf { it.isNotBlank() }?.let { id ->
                     nav.navigate("detail/${Uri.encode(id)}") { launchSingleTop = true }
                 }
                 "alerts" -> nav.navigate("alerts") { launchSingleTop = true }
             }
+        }
+
+        LaunchedEffect(initialUri) {
+            val uri = initialUri?.let(Uri::parse) ?: return@LaunchedEffect
+            navigateNativeUri(uri)
             onInitialUriConsumed()
         }
 
@@ -104,11 +108,12 @@ fun ConcursosApp(
                 modifier = androidx.compose.ui.Modifier.padding(paddingValues),
             ) {
                 composable("home") {
-                    HomeScreen(
+                    DashboardHomeScreen(
                         vm = vm,
                         onOpenContests = { nav.navigate("contests") },
                         onOpenAlerts = { nav.navigate("alerts") },
                         onDetail = { nav.navigate("detail/${Uri.encode(it.id)}") },
+                        onNativeRoute = navigateNativeUri,
                     )
                 }
                 composable("alerts") { AlertsScreen(vm) }
