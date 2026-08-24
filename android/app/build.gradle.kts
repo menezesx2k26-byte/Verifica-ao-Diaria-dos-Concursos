@@ -13,8 +13,8 @@ android {
         applicationId = "com.menezes.concursoswatch"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "3.0.0"
+        versionCode = 7
+        versionName = "4.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val apiBase = providers.gradleProperty("CONCURSOS_API_BASE_URL").orNull ?: ""
         buildConfigField("String", "API_BASE_URL", "\"$apiBase\"")
