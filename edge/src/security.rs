@@ -1,3 +1,51 @@
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+
+pub fn dashboard_csp() -> &'static str {
+    "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; script-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; base-uri 'none';"
+}
+
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut out = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut out, "{byte:02x}");
+    }
+    out
+}
+
+pub fn bundle_etag(html: &[u8], css: &[u8], dashboard_version: u64) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(dashboard_version.to_be_bytes());
+    hasher.update((html.len() as u64).to_be_bytes());
+    hasher.update(html);
+    hasher.update((css.len() as u64).to_be_bytes());
+    hasher.update(css);
+    let digest = hasher.finalize();
+    let mut value = String::with_capacity(digest.len() * 2 + 2);
+    value.push('"');
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut value, "{byte:02x}");
+    }
+    value.push('"');
+    value
+}
+
+pub fn dashboard_security_headers() -> BTreeMap<&'static str, &'static str> {
+    BTreeMap::from([
+        ("Content-Security-Policy", dashboard_csp()),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Referrer-Policy", "no-referrer"),
+        (
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=()",
+        ),
+        ("Cross-Origin-Resource-Policy", "same-origin"),
+    ])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
