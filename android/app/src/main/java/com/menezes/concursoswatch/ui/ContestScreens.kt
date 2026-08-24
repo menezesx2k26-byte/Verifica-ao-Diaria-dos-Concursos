@@ -52,6 +52,8 @@ fun ContestListScreen(
     onDetail: (Contest) -> Unit,
 ) {
     val list = vm.filteredContests(favoritesOnly)
+    val firstSyncPending = vm.state.lastSync == 0L
+    val unreadVisible = list.any { it.unread }
 
     LazyColumn(contentPadding = PaddingValues(bottom = 28.dp)) {
         item {
@@ -82,24 +84,33 @@ fun ContestListScreen(
                 FilterLabel("Situação")
                 StatusFilters(vm)
 
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
                     Text(
-                        "${list.size} resultado(s)",
+                        if (firstSyncPending && vm.state.syncing) "Buscando oportunidades…" else "${list.size} resultado(s)",
                         color = AppMuted,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 12.dp),
                     )
-                    TextButton(onClick = vm::markAllContestsRead) { Text("Marcar como lidos") }
+                    if (unreadVisible) {
+                        TextButton(onClick = vm::markAllContestsRead) { Text("Marcar como lidos") }
+                    }
                 }
             }
         }
 
         if (list.isEmpty()) {
             item {
-                EmptyCard(
-                    if (favoritesOnly) "Nenhum favorito ainda. Toque na estrela de um concurso para salvar."
-                    else "Nenhum concurso combina com os filtros atuais.",
-                )
+                val message = when {
+                    favoritesOnly -> "Nenhum favorito ainda. Toque na estrela de um concurso para salvar."
+                    firstSyncPending && vm.state.syncing -> "Buscando concursos e processos seletivos nas fontes oficiais…"
+                    vm.state.contestError != null && vm.state.contests.isEmpty() -> "Não foi possível atualizar os concursos agora. Tente verificar novamente em instantes."
+                    vm.state.contests.isEmpty() -> "Nenhum concurso ativo foi encontrado na última verificação."
+                    else -> "Nenhum concurso combina com os filtros atuais."
+                }
+                EmptyCard(message)
             }
         } else {
             items(list, key = { it.id }) { ContestCard(it, vm::toggleFavorite, onDetail) }
@@ -211,7 +222,7 @@ fun ContestDetailScreen(vm: AppViewModel, contestId: String, onBack: () -> Unit)
                 StatusPill(c.status, c.active)
                 Text(
                     c.title,
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.padding(top = 14.dp),
                 )
                 Text(
