@@ -1,11 +1,27 @@
 pub mod db;
 pub mod query;
 
+const MUTATING_METHODS: &[&str] = &["POST", "PUT", "PATCH", "DELETE"];
+
 pub fn route_key(method: &str, path: &str) -> &'static str {
-    match (method, path) {
-        ("GET", "/health") => "health",
-        ("POST" | "PUT" | "PATCH" | "DELETE", "/health") => "method_not_allowed",
-        (_, "/api/v1/ingest") => "not_found",
+    if path == "/api/v1/ingest" {
+        return "not_found";
+    }
+
+    let known = match path {
+        "/health" => Some("health"),
+        "/api/v1/contests" => Some("contests"),
+        "/api/v1/alerts" => Some("alerts"),
+        "/api/v1/sources" => Some("sources"),
+        _ if path
+            .strip_prefix("/api/v1/contests/")
+            .is_some_and(|id| !id.is_empty()) => Some("contest_detail"),
+        _ => None,
+    };
+
+    match (method, known) {
+        ("GET", Some(route)) => route,
+        (m, Some(_)) if MUTATING_METHODS.contains(&m) => "method_not_allowed",
         _ => "not_found",
     }
 }
