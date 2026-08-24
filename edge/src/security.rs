@@ -1,5 +1,20 @@
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DashboardManifest {
+    pub schema_version: u32,
+    pub dashboard_version: u64,
+    pub style_version: u64,
+    pub min_app_version: String,
+    pub published_at: String,
+    pub html_url: String,
+    pub css_url: String,
+    pub html_sha256: String,
+    pub css_sha256: String,
+    pub etag: String,
+}
 
 pub fn dashboard_csp() -> &'static str {
     "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; script-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'; base-uri 'none';"
@@ -31,6 +46,30 @@ pub fn bundle_etag(html: &[u8], css: &[u8], dashboard_version: u64) -> String {
     }
     value.push('"');
     value
+}
+
+pub fn build_dashboard_manifest(
+    dashboard_version: u64,
+    style_version: u64,
+    min_app_version: &str,
+    published_at: &str,
+    html_url: &str,
+    css_url: &str,
+    html: &[u8],
+    css: &[u8],
+) -> DashboardManifest {
+    DashboardManifest {
+        schema_version: 1,
+        dashboard_version,
+        style_version,
+        min_app_version: min_app_version.to_owned(),
+        published_at: published_at.to_owned(),
+        html_url: html_url.to_owned(),
+        css_url: css_url.to_owned(),
+        html_sha256: sha256_hex(html),
+        css_sha256: sha256_hex(css),
+        etag: bundle_etag(html, css, dashboard_version),
+    }
 }
 
 pub fn dashboard_security_headers() -> BTreeMap<&'static str, &'static str> {
