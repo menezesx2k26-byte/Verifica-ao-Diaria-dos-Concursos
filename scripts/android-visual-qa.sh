@@ -3,20 +3,46 @@ set -euo pipefail
 
 PKG="com.menezes.concursoswatch.dev"
 ACTIVITY="$PKG/com.menezes.concursoswatch.MainActivity"
+FIXTURE_SOURCE="android/visual-fixtures/dashboard"
+FIXTURE_DIR="dashboard-fixture"
+
+mkdir -p "$FIXTURE_DIR" visual-qa
+cp "$FIXTURE_SOURCE/index.html" "$FIXTURE_DIR/index.html"
+cp "$FIXTURE_SOURCE/dashboard.css" "$FIXTURE_DIR/dashboard.css"
+python - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+root = Path("dashboard-fixture")
+html = (root / "index.html").read_bytes()
+css = (root / "dashboard.css").read_bytes()
+manifest = {
+    "schema_version": 1,
+    "dashboard_version": 9001,
+    "style_version": 4,
+    "min_app_version": "4.0.0",
+    "published_at": "2026-08-24T12:00:00Z",
+    "html_url": "https://concursos-watch.example.workers.dev/dashboard",
+    "css_url": "https://concursos-watch.example.workers.dev/assets/dashboard.css",
+    "html_sha256": hashlib.sha256(html).hexdigest(),
+    "css_sha256": hashlib.sha256(css).hexdigest(),
+    "etag": "visual-qa-v4-9001",
+}
+(root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+PY
 
 adb wait-for-device
 gradle -p android :app:connectedDebugAndroidTest --stacktrace
-mkdir -p visual-qa
-
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS || true
 
-# Seed a bundle that already satisfies the Android dashboard contract.
+# Seed a last-known-good bundle already validated by the Android contract.
 for file in manifest.json index.html dashboard.css; do
-  adb push "dashboard-fixture/$file" "/data/local/tmp/cw-$file" >/dev/null
+  adb push "$FIXTURE_DIR/$file" "/data/local/tmp/cw-$file" >/dev/null
   adb shell chmod 644 "/data/local/tmp/cw-$file"
 done
-adb shell "run-as $PKG mkdir -p files/dashboard/current"
+adb shell "run-as $PKG rm -rf files/dashboard && mkdir -p files/dashboard/current"
 adb shell "run-as $PKG cp /data/local/tmp/cw-manifest.json files/dashboard/current/manifest.json"
 adb shell "run-as $PKG cp /data/local/tmp/cw-index.html files/dashboard/current/index.html"
 adb shell "run-as $PKG cp /data/local/tmp/cw-dashboard.css files/dashboard/current/dashboard.css"
