@@ -20,6 +20,20 @@ class BuildD1SnapshotTest(unittest.TestCase):
 
         self.assertEqual([item["id"] for item in snapshot.contests], ["ok"])
 
+    def test_referenced_priority_contest_gets_a_stable_fk_parent(self):
+        priority = {
+            "documents": [{"id": "doc-1", "contest_id": "pg-004-2024-acs"}],
+            "events": [{"id": "event-1", "contest_id": "pg-004-2024-acs"}],
+            "source_health": [],
+        }
+
+        snapshot = build_snapshot({"items": [], "source_health": []}, priority)
+
+        self.assertIn("pg-004-2024-acs", {item["id"] for item in snapshot.contests})
+        parent = next(item for item in snapshot.contests if item["id"] == "pg-004-2024-acs")
+        self.assertEqual(parent["relevance_status"], "ACCEPTED")
+        self.assertTrue(parent["active"])
+
     def test_write_sql_is_transactional_and_escapes_source_text(self):
         snapshot = Snapshot(
             contests=({
