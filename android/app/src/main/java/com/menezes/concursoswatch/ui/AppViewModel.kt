@@ -6,7 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.menezes.concursoswatch.BuildConfig
 import com.menezes.concursoswatch.data.ContestRepository
+import com.menezes.concursoswatch.data.DashboardRemoteDataSource
+import com.menezes.concursoswatch.data.DashboardRepository
+import com.menezes.concursoswatch.data.DashboardStore
+import com.menezes.concursoswatch.data.DashboardUiState
+import com.menezes.concursoswatch.data.DashboardValidator
 import com.menezes.concursoswatch.data.SettingsStore
 import com.menezes.concursoswatch.model.AlertItem
 import com.menezes.concursoswatch.model.Contest
@@ -18,6 +24,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.net.URI
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -29,16 +38,22 @@ data class AppUiState(
     val lastSync: Long = 0L, val contestError: String? = null, val alertError: String? = null,
     val sourceCount: Int = 0, val healthySources: Int = 0, val settings: UserSettings = UserSettings(),
     val latestRelease: String? = null, val selectedContest: Contest? = null,
+    val dashboard: DashboardUiState = DashboardUiState.Loading,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ContestRepository(app)
     private val settingsStore = SettingsStore(app)
-    var state by mutableStateOf(AppUiState()); private set
+    private val dashboardRemote = DashboardRemoteDataSource()
+    private val dashboardRoot = File(app.filesDir, "dashboard")
+
+    var state by mutableStateOf(AppUiState())
+        private set
 
     init {
         reload()
         viewModelScope.launch { settingsStore.flow.collectLatest { state = state.copy(settings = it) } }
+        refreshDashboard()
         // A first launch must never sit on an empty "waiting for the 15-minute worker" state.
         // Refresh immediately; WorkManager remains the background safety net afterwards.
         syncNow()
@@ -55,7 +70,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     sourceCount = repo.sourceCount(), healthySources = health.count { it.ok }, latestRelease = repo.latestKnownRelease(),
                 )
             }
-            state = loaded.copy(settings = state.settings, syncing = state.syncing, selectedContest = state.selectedContest)
+            state = loaded.copy(
+                settings = state.settings,
+                syncing = state.syncing,
+                selectedContest = state.selectedContest,
+                dashboard = state.dashboard,
+            )
         }
     }
 
@@ -66,8 +86,59 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) { repo.syncAll() }
             state = state.copy(syncing = false)
             reload()
+            refreshDashboard()
         }
     }
+
+    fun refreshDashboard() {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    dashboardRepository().let { dashboardRepository ->
+                        val cached = dashboardRepository.cachedState()
+                        if (cached is DashboardUiState.Ready) {
+                            withContext(Dispatchers.Main) {
+                                state = state.copy(dashboard = cached)
+                            }
+                        }
+                        dashboardRepository.refresh()
+                    }
+                }.getOrElse { error ->
+                    state.dashboard.takeIf { it is DashboardUiState.Ready }
+                        ?: DashboardUiState.Unavailable(error.message ?: "dashboard_unavailable")
+                }
+            }
+            state = state.copy(dashboard = result)
+        }
+    }
+
+    private fun dashboardRepository(): DashboardRepository {
+        val host = trustedDashboardHost()
+        val validator = DashboardValidator(
+            officialHost = host,
+            currentAppVersion = BuildConfig.VERSION_NAME,
+        )
+        return DashboardRepository(
+            remote = dashboardRemote,
+            store = DashboardStore(dashboardRoot, validator),
+        )
+    }
+
+    private fun trustedDashboardHost(): String {
+        BuildConfig.API_BASE_URL.trim().takeIf { it.isNotEmpty() }?.let { configured ->
+            return requireNotNull(URI(configured).host) { "dashboard configured host ausente" }
+        }
+
+        cachedDashboardHost()?.let { return it }
+        return dashboardRemote.officialHost()
+    }
+
+    private fun cachedDashboardHost(): String? = runCatching {
+        val manifestFile = File(File(dashboardRoot, "current"), DashboardStore.MANIFEST_FILE)
+        if (!manifestFile.exists()) return@runCatching null
+        val htmlUrl = JSONObject(manifestFile.readText()).getString("html_url")
+        URI(htmlUrl).host?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     fun setSearch(value: String) { state = state.copy(search = value) }
     fun setRegion(value: RegionFilter) { state = state.copy(regionFilter = value) }
