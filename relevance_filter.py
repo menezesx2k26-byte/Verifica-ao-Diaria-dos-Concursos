@@ -105,8 +105,12 @@ AMBIGUOUS_PERSONNEL_TERMS = (
 )
 
 
+def _contains_term(corpus: str, term: str) -> bool:
+    return re.search(rf"(?<!\w){re.escape(term)}(?!\w)", corpus) is not None
+
+
 def _hits(corpus: str, terms: tuple[str, ...]) -> tuple[str, ...]:
-    return tuple(term for term in terms if term in corpus)
+    return tuple(term for term in terms if _contains_term(corpus, term))
 
 
 def evaluate_candidate(title: str, context: str, url: str) -> RelevanceDecision:
@@ -174,11 +178,11 @@ def matches_interest_profile(item: dict, profile: dict) -> bool:
     title_corpus = fold_relevance(" ".join(str(item.get(k, "")) for k in ("title", "organization", "city", "area", "type")))
 
     excluded = _fold_values(profile.get("exclude_keywords"))
-    if any(term in title_corpus for term in excluded):
+    if any(_contains_term(title_corpus, term) for term in excluded):
         return False
 
     included = _fold_values(profile.get("include_keywords"))
-    if included and not any(term in title_corpus for term in included):
+    if included and not any(_contains_term(title_corpus, term) for term in included):
         return False
 
     allowed_scopes = _fold_values(profile.get("scope"))
