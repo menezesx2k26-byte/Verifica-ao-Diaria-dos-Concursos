@@ -16,7 +16,10 @@ pub fn route_key(method: &str, path: &str) -> &'static str {
         "/api/v1/sources" => Some("sources"),
         _ if path
             .strip_prefix("/api/v1/contests/")
-            .is_some_and(|id| !id.is_empty()) => Some("contest_detail"),
+            .is_some_and(|id| !id.is_empty()) =>
+        {
+            Some("contest_detail")
+        }
         _ => None,
     };
 
