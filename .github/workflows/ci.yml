@@ -15,11 +15,17 @@ on:
       - "canonicalize_contests.py"
       - "generic_health.py"
       - "priority_scanner.py"
-      - "publish_api_snapshot.py"
+      - "build_d1_snapshot.py"
+      - "ensure_d1_v4.py"
+      - "validate_dashboard_config.py"
+      - "validate_dashboard_bundle.py"
+      - "build_dashboard_sql.py"
       - "tests/**"
       - "config/**"
       - "requirements.txt"
-      - "cloudflare/**"
+      - "cloudflare/schema.sql"
+      - "cloudflare/migrations/**"
+      - "edge/**"
       - "scripts/**"
       - ".github/workflows/**"
 
@@ -29,7 +35,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
 
@@ -41,56 +47,19 @@ jobs:
       - name: Instalar dependências Python
         run: pip install -r requirements.txt
 
-      - name: Validar Python e regressões anti-ruído
+      - name: Python syntax and v4 regression suite
         run: |
-          python -m py_compile monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py priority_scanner.py publish_api_snapshot.py
+          python -m py_compile \
+            monitor.py monitor_runner.py smtp_alert.py deep_audit.py search_probe.py \
+            new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py \
+            priority_scanner.py build_d1_snapshot.py ensure_d1_v4.py \
+            validate_dashboard_config.py validate_dashboard_bundle.py build_dashboard_sql.py
           python monitor.py --self-test
           python -m unittest discover -s tests -p "test_*.py" -v
-          python - <<'PY'
-          import json, tempfile
-          from pathlib import Path
-          import deep_audit, monitor, monitor_runner as tr, smtp_alert, search_probe, priority_scanner as ps
 
-          assert tr._allowed("https://www.ibamsp-concursos.org.br/informacoes/134/")
-          assert not tr._allowed("https://example.com/")
-          assert 'href="https://example.org/a.pdf"' in tr._markdown_as_html("[Edital](https://example.org/a.pdf)")
-          assert smtp_alert.send_gmail("teste", "teste") is False
-
-          temp_state = Path(tempfile.mkdtemp()) / "state.json"
-          tr.monitor.STATE = temp_state
-          fake_state = {"ibam": {"failures": 3, "last_status": 200}}
-          tr.save_with_state_integrity(temp_state, fake_state)
-          assert fake_state["ibam"]["last_attempt_ok"] is False
-          assert fake_state["ibam"]["last_status"] is None
-
-          with open("config/sources.json", encoding="utf-8") as f:
-              source_cfg = json.load(f)
-          sources = {s["id"]: s for s in source_cfg["sources"]}
-          assert monitor.document_result("CONCURSO PUBLICO 02/2026. AGENTE DE TRANSITO. Convocacao para teste fisico.", sources["sv_pref_02_2026"])[0] is False
-          assert monitor.document_result("CONCURSO PUBLICO 02/2026. ASSISTENTE TECNICO DE GESTAO. Convocacao para entrega de documentos e posse.", sources["sv_pref_02_2026"])[0] is True
-          assert monitor.document_result("CONCURSO PUBLICO 004/2024. AGENTE COMUNITARIO DE SAUDE - ACS. Convocacao para exame admissional.", sources["pg_diario"])[0] is True
-
-          fake_search = '''Title: IBAM São Vicente\nURL Source: https://www.ibamsp-concursos.org.br/informacoes/134/\nSÃO VICENTE - CONCURSO PÚBLICO - 02/2026\n24- Despacho de Homologação Parcial'''
-          sections = search_probe.official_sections(fake_search, "ibamsp-concursos.org.br/informacoes/134")
-          assert len(sections) == 1
-          assert deep_audit.audit_content_url("https://www.saovicente.sp.gov.br/x/ato.pdf/view?download=1") == "https://www.saovicente.sp.gov.br/x/ato.pdf?download=1"
-
-          watch = ps.WATCHES[1]
-          html = '<div>Concurso 02/2026 Assistente-Técnico de Gestão <a href="/edital.pdf">Edital 02/2026 Assistente Técnico de Gestão</a></div>'
-          links = ps.candidate_links("https://example.gov.br/base", html, watch)
-          assert links and links[0][0] == "https://example.gov.br/edital.pdf"
-          events = ps.detect_events(watch, "source", "Edital 02/2026 Assistente Técnico de Gestão. Convocação. Gabriel Veloso Menezes.", "https://x", "abc", "2026-08-23T00:00:00Z")
-          assert any(e["type"] == "candidate_mention" and e["priority"] == 130 for e in events)
-          assert any(e["type"] == "convocation" for e in events)
-          print("v4 regression suite OK")
-          PY
-
-      - name: Relevance anti-noise regression
+      - name: Relevance anti-noise gate
         run: |
           python -m unittest tests.test_relevance_filter tests.test_new_contests -v
-
-      - name: Guard broad contest terms
-        run: |
           python - <<'PY'
           import json
           with open('config/new_contests_sources.json', encoding='utf-8') as f:
@@ -99,6 +68,29 @@ jobs:
           assert 'edital' not in terms, 'bare edital must never be a broad positive signal'
           PY
 
+      - name: Dashboard declarative and static security gates
+        run: |
+          python validate_dashboard_config.py config/dashboard.json
+          cargo run --quiet --manifest-path edge/Cargo.toml --bin render-dashboard-preview
+          python validate_dashboard_bundle.py edge/test-output/dashboard.html edge/test-output/dashboard.css
+
+      - name: D1 v4 schema contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          schema=Path('cloudflare/schema.sql').read_text(encoding='utf-8').lower()
+          migration=Path('cloudflare/migrations/0002_v4.sql').read_text(encoding='utf-8').lower()
+          for token in ('relevance_status', 'relevance_confidence', 'dashboard_configs'):
+              assert token in schema, token
+              assert token in migration, token
+          assert "status in ('draft', 'published', 'superseded')" in schema
+          print('D1 v4 schema contract OK')
+          PY
+
+      - name: Legacy public ingest must not be reachable from Rust
+        run: |
+          cargo test --manifest-path edge/Cargo.toml public_ingest_does_not_exist -- --exact
+
       - name: Validar bootstrap PowerShell
         shell: pwsh
         run: |
@@ -106,20 +98,3 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "scripts/bootstrap-windows.ps1"), [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Validar Worker, API D1 e Wrangler
-        working-directory: cloudflare
-        env:
-          WATCHDOG_TOKEN: ci-placeholder-not-a-real-secret
-        run: |
-          npm install --no-audit --no-fund
-          node --check src/index.js
-          node --check src/app.js
-          node scripts/bootstrap.mjs --offline
-          node scripts/secrets.mjs
-          npx wrangler deploy --dry-run --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
-          rm -f wrangler.generated.jsonc .secrets.generated.json
