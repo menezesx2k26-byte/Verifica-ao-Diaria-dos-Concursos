@@ -1,3 +1,5 @@
+pub mod query;
+
 pub fn route_key(method: &str, path: &str) -> &'static str {
     match (method, path) {
         ("GET", "/health") => "health",
