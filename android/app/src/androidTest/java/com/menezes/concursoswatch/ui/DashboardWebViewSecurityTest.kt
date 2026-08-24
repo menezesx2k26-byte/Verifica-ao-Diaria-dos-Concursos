@@ -16,20 +16,31 @@ class DashboardWebViewSecurityTest {
     @Test
     fun webViewIsLockedBeforeLoadingDashboard() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        lateinit var webView: WebView
+        var javaScriptEnabled = true
+        var domStorageEnabled = true
+        var allowFileAccess = true
+        var allowContentAccess = true
+        var mixedContentMode = -1
+        var blockNetworkLoads = false
+
         instrumentation.runOnMainSync {
-            webView = WebView(instrumentation.targetContext)
+            val webView = WebView(instrumentation.targetContext)
             DashboardWebViewSecurity.apply(webView)
+            javaScriptEnabled = webView.settings.javaScriptEnabled
+            domStorageEnabled = webView.settings.domStorageEnabled
+            allowFileAccess = webView.settings.allowFileAccess
+            allowContentAccess = webView.settings.allowContentAccess
+            mixedContentMode = webView.settings.mixedContentMode
+            blockNetworkLoads = webView.settings.blockNetworkLoads
+            webView.destroy()
         }
 
-        assertFalse(webView.settings.javaScriptEnabled)
-        assertFalse(webView.settings.domStorageEnabled)
-        assertFalse(webView.settings.allowFileAccess)
-        assertFalse(webView.settings.allowContentAccess)
-        assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, webView.settings.mixedContentMode)
-        assertTrue(webView.settings.blockNetworkLoads)
-
-        instrumentation.runOnMainSync { webView.destroy() }
+        assertFalse(javaScriptEnabled)
+        assertFalse(domStorageEnabled)
+        assertFalse(allowFileAccess)
+        assertFalse(allowContentAccess)
+        assertEquals(WebSettings.MIXED_CONTENT_NEVER_ALLOW, mixedContentMode)
+        assertTrue(blockNetworkLoads)
     }
 
     @Test
