@@ -25,6 +25,14 @@ class RelevanceFilterTests(unittest.TestCase):
         )
         self.assertEqual(d.status, "REJECTED_NAVIGATION")
 
+    def test_rejects_navigation_even_when_page_context_mentions_recruitment(self):
+        d = evaluate_candidate(
+            "Institucional",
+            "TJSC concurso público edital inscrições abertas",
+            "https://www.tjsc.jus.br/institucional",
+        )
+        self.assertEqual(d.status, "REJECTED_NAVIGATION")
+
     def test_edital_alone_is_not_recruitment(self):
         d = evaluate_candidate(
             "Edital nº 42/2026",
