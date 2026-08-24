@@ -3,6 +3,7 @@ package com.menezes.concursoswatch.data
 import com.menezes.concursoswatch.BuildConfig
 import com.menezes.concursoswatch.model.AlertItem
 import com.menezes.concursoswatch.model.Contest
+import com.menezes.concursoswatch.model.ContestFeedGuard
 import com.menezes.concursoswatch.model.SourceHealth
 import org.json.JSONArray
 import org.json.JSONObject
@@ -51,7 +52,8 @@ class RemoteDataSource {
                 ))
             }
         }
-        return ContestFeed(items.filter { it.active }, health, root.optInt("source_count",health.size), root.optString("updated_at"))
+        val safeItems = items.filter { it.active && ContestFeedGuard.accepts(it) }
+        return ContestFeed(safeItems, health, root.optInt("source_count",health.size), root.optString("updated_at"))
     }
 
     fun fetchAlerts(): List<AlertItem> {
