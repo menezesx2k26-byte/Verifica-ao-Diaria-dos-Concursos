@@ -1,7 +1,5 @@
 use crate::dashboard::{render_dashboard, DashboardConfig, DashboardContest, DashboardData};
-use crate::db::{
-    get_contest, list_alerts, list_contests, list_sources, load_published_dashboard,
-};
+use crate::db::{get_contest, list_alerts, list_contests, list_sources, load_published_dashboard};
 use crate::error::AppError;
 use crate::models::{ApiEnvelope, ContestFeedDto, ErrorDto, HealthDto};
 use crate::query::ContestFilters;
@@ -45,7 +43,11 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
             let updated_at = items
                 .iter()
                 .map(|item| item.updated_at.as_str())
-                .chain(source_health.iter().map(|source| source.checked_at.as_str()))
+                .chain(
+                    source_health
+                        .iter()
+                        .map(|source| source.checked_at.as_str()),
+                )
                 .max()
                 .unwrap_or_default()
                 .to_string();
@@ -56,7 +58,11 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
                 items,
                 source_health,
             };
-            json_response(&payload, 200, "public, max-age=60, stale-while-revalidate=120")
+            json_response(
+                &payload,
+                200,
+                "public, max-age=60, stale-while-revalidate=120",
+            )
         }
         "contest_detail" => {
             let id = path
@@ -65,17 +71,29 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
                 .ok_or(AppError::NotFound)?;
             let db = env.d1("DB").map_err(|_| AppError::Internal)?;
             let item = get_contest(&db, id).await?.ok_or(AppError::NotFound)?;
-            json_response(&item, 200, "public, max-age=60, stale-while-revalidate=120")
+            json_response(
+                &item,
+                200,
+                "public, max-age=60, stale-while-revalidate=120",
+            )
         }
         "alerts" => {
             let db = env.d1("DB").map_err(|_| AppError::Internal)?;
             let payload = ApiEnvelope::new(list_alerts(&db).await?);
-            json_response(&payload, 200, "public, max-age=30, stale-while-revalidate=60")
+            json_response(
+                &payload,
+                200,
+                "public, max-age=30, stale-while-revalidate=60",
+            )
         }
         "sources" => {
             let db = env.d1("DB").map_err(|_| AppError::Internal)?;
             let payload = ApiEnvelope::new(list_sources(&db).await?);
-            json_response(&payload, 200, "public, max-age=60, stale-while-revalidate=120")
+            json_response(
+                &payload,
+                200,
+                "public, max-age=60, stale-while-revalidate=120",
+            )
         }
         "dashboard" => {
             let db = env.d1("DB").map_err(|_| AppError::Internal)?;
@@ -134,9 +152,7 @@ async fn dispatch(req: &Request, env: &Env) -> Result<Response, AppError> {
     }
 }
 
-async fn build_dashboard_bundle(
-    db: &worker::d1::D1Database,
-) -> Result<DashboardBundle, AppError> {
+async fn build_dashboard_bundle(db: &worker::d1::D1Database) -> Result<DashboardBundle, AppError> {
     let (config, published_at) = match load_published_dashboard(db).await? {
         Some(value) => value,
         None => (
@@ -176,7 +192,11 @@ async fn build_dashboard_bundle(
             .collect(),
     };
     let html = render_dashboard(&config, &data).map_err(|_| AppError::Internal)?;
-    let etag = bundle_etag(html.as_bytes(), DASHBOARD_CSS.as_bytes(), config.dashboard_version);
+    let etag = bundle_etag(
+        html.as_bytes(),
+        DASHBOARD_CSS.as_bytes(),
+        config.dashboard_version,
+    );
     Ok(DashboardBundle {
         config,
         published_at,
@@ -231,7 +251,10 @@ fn apply_dashboard_headers(
         .map_err(|_| AppError::Internal)?;
     response
         .headers_mut()
-        .set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
+        .set(
+            "Cache-Control",
+            "public, max-age=300, stale-while-revalidate=3600",
+        )
         .map_err(|_| AppError::Internal)?;
     response
         .headers_mut()
@@ -239,7 +262,10 @@ fn apply_dashboard_headers(
         .map_err(|_| AppError::Internal)?;
     response
         .headers_mut()
-        .set("X-Content-SHA256", &sha256_hex(response_body_marker(content_type)))
+        .set(
+            "X-Content-SHA256",
+            &sha256_hex(response_body_marker(content_type)),
+        )
         .map_err(|_| AppError::Internal)?;
     Ok(())
 }
@@ -274,7 +300,10 @@ fn not_modified(etag: &str, dashboard_headers: bool) -> Result<Response, AppErro
         .map_err(|_| AppError::Internal)?;
     response
         .headers_mut()
-        .set("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
+        .set(
+            "Cache-Control",
+            "public, max-age=300, stale-while-revalidate=3600",
+        )
         .map_err(|_| AppError::Internal)?;
     Ok(response)
 }
