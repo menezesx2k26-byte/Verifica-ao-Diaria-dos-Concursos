@@ -31,14 +31,17 @@ pub struct ContestDto {
     pub remuneration: String,
     pub vacancies: String,
     pub fee: String,
+    #[serde(rename = "start_date")]
     pub registration_start: String,
+    #[serde(rename = "end_date")]
     pub registration_end: String,
     pub status: String,
     pub source: String,
+    #[serde(rename = "url")]
     pub source_url: String,
     pub edital_url: String,
     pub priority: i32,
-    pub active: i32,
+    pub active: bool,
     pub first_seen: String,
     pub last_seen: String,
     pub updated_at: String,
@@ -60,15 +63,24 @@ pub struct SourceHealthDto {
     pub id: String,
     pub label: String,
     pub url: String,
-    pub http_ok: i32,
-    pub parser_ok: i32,
-    pub semantic_ok: i32,
+    pub http_ok: bool,
+    pub parser_ok: bool,
+    pub semantic_ok: bool,
     pub item_count: i32,
     pub expected_min: i32,
     pub checked_at: String,
     pub last_success_at: String,
     pub scan_status: String,
     pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ContestFeedDto {
+    pub schema_version: u32,
+    pub updated_at: String,
+    pub source_count: usize,
+    pub items: Vec<ContestDto>,
+    pub source_health: Vec<SourceHealthDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -109,6 +121,9 @@ mod tests {
         let contest = ContestDto::default();
         let json = serde_json::to_value(contest).unwrap();
         assert!(json.get("title").is_some());
+        assert!(json.get("start_date").is_some());
+        assert!(json.get("end_date").is_some());
+        assert!(json.get("url").is_some());
         assert!(json.get("relevance_status").is_none());
         assert!(json.get("sync_generation").is_none());
     }
