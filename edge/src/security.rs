@@ -87,6 +87,25 @@ pub fn dashboard_security_headers() -> BTreeMap<&'static str, &'static str> {
     ])
 }
 
+pub fn dashboard_asset_headers(
+    body: &[u8],
+    content_type: &str,
+    etag: &str,
+) -> BTreeMap<&'static str, String> {
+    let mut headers = dashboard_security_headers()
+        .into_iter()
+        .map(|(name, value)| (name, value.to_owned()))
+        .collect::<BTreeMap<_, _>>();
+    headers.insert("Content-Type", content_type.to_owned());
+    headers.insert(
+        "Cache-Control",
+        "public, max-age=300, stale-while-revalidate=3600".to_owned(),
+    );
+    headers.insert("ETag", etag.to_owned());
+    headers.insert("X-Content-SHA256", sha256_hex(body));
+    headers
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
