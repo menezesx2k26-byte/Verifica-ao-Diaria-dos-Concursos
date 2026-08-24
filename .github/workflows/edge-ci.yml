@@ -41,7 +41,9 @@ jobs:
           forbidden = ('@import', 'url(http://', 'url(https://', 'url(//', 'javascript:')
           for token in forbidden:
               assert token not in css, f'forbidden dashboard CSS token: {token}'
-          html = Path('edge/src/dashboard.rs').read_text(encoding='utf-8').lower()
-          assert '<script' not in html.replace('&lt;script', ''), 'renderer must not emit script tags'
+
+          source = Path('edge/src/dashboard.rs').read_text(encoding='utf-8')
+          production_renderer = source.split('#[cfg(test)]', 1)[0].lower()
+          assert '<script' not in production_renderer, 'production renderer must not emit script tags'
           print('dashboard static security guard OK')
           PY
