@@ -35,7 +35,7 @@
   },
   "sv_ibam_02_2026": {
     "failures": 3,
-    "last_error": "fallback Reader falhou/foi rejeitado para https://www.ibamsp-concursos.org.br/informacoes/134/: Reader respondeu, mas não comprovou a identidade da página oficial (grupos encontrados=[[], [], []])",
+    "last_error": "fallback Reader falhou/foi rejeitado para https://www.ibamsp-concursos.org.br/informacoes/134/: 401 Client Error: Unauthorized for url: https://r.jina.ai/https://www.ibamsp-concursos.org.br/informacoes/134/",
     "resolved_url": "https://www.ibamsp-concursos.org.br/informacoes/134/",
     "last_status": null,
     "parser_version": 4,
