@@ -1,138 +1,18 @@
-name: Deploy Cloudflare Watch
+name: Cloudflare Watch - Centralized
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "cloudflare/**"
-      - ".github/workflows/cloudflare-deploy.yml"
 
 permissions:
-  contents: write
-
-concurrency:
-  group: concursos-watch-cloudflare-deploy
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  deploy:
+  centralized:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      WATCHDOG_TOKEN: ${{ secrets.WATCHDOG_TOKEN }}
-      WATCH_PRIORITY_TERMS: ${{ secrets.WATCH_PRIORITY_TERMS }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-      NTFY_SERVER: ${{ secrets.NTFY_SERVER }}
-      NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
-      CF_EMAIL_ENABLED: ${{ vars.CF_EMAIL_ENABLED }}
-      CF_EMAIL_FROM: ${{ secrets.CF_EMAIL_FROM }}
-      CF_EMAIL_TO: ${{ secrets.CF_EMAIL_TO }}
-      CF_WORKER_NAME: concursos-watch-redundante
-
+    timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Preflight de credenciais
-        id: preflight
-        shell: bash
+      - name: Explain centralized deploy
         run: |
-          set -euo pipefail
-          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" || -z "$WATCHDOG_TOKEN" ]]; then
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Cloudflare aguardando secrets::Configure CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID e WATCHDOG_TOKEN e execute este workflow novamente."
-            exit 0
-          fi
-          echo "ready=true" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/setup-node@v4
-        if: steps.preflight.outputs.ready == 'true'
-        with:
-          node-version: "20"
-
-      - name: Instalar Wrangler
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: npm install --no-audit --no-fund
-
-      - name: Criar/reutilizar KV e gerar configuração
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: node scripts/bootstrap.mjs
-
-      - name: Preparar secrets do Worker
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: node scripts/secrets.mjs
-
-      - name: Validar configuração antes do deploy
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
-
-      - name: Implantar Worker e Cron Triggers
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .secrets.generated.json
-
-      - name: Descobrir URL pública do Worker
-        if: steps.preflight.outputs.ready == 'true'
-        working-directory: cloudflare
-        run: node scripts/discover-url.mjs
-
-      - name: Smoke test /health
-        if: steps.preflight.outputs.ready == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE_URL="$(python -c 'import json; print(json.load(open("config/runtime.json"))["cloudflare_url"])')"
-          for attempt in 1 2 3 4 5; do
-            if curl --fail --silent --show-error --max-time 15 "$BASE_URL/health"; then
-              echo
-              exit 0
-            fi
-            sleep $((attempt * 3))
-          done
-          echo "Worker implantado, mas /health não respondeu após as tentativas."
-          exit 1
-
-      - name: Inicializar baseline e heartbeat Cloudflare
-        if: steps.preflight.outputs.ready == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          BASE_URL="$(python -c 'import json; print(json.load(open("config/runtime.json"))["cloudflare_url"])')"
-          curl --fail --silent --show-error --max-time 90 \
-            -X POST "$BASE_URL/run" \
-            -H "Authorization: Bearer $WATCHDOG_TOKEN" \
-            -H "Content-Type: application/json"
-          echo
-
-      - name: Persistir URL do Worker no repositório
-        if: steps.preflight.outputs.ready == 'true' && github.ref == 'refs/heads/main'
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ ! -f config/runtime.json ]]; then
-            echo "discover-url.mjs não gerou config/runtime.json"
-            exit 1
-          fi
-          if [[ -z "$(git status --porcelain -- config/runtime.json)" ]]; then
-            echo "runtime.json já está atualizado."
-            exit 0
-          fi
-          git config user.name "concursos-watch[bot]"
-          git config user.email "concursos-watch[bot]@users.noreply.github.com"
-          git add config/runtime.json
-          git commit -m "chore(cloudflare): record deployed worker URL"
-          git pull --rebase origin main
-          git push origin HEAD:main
-
-      - name: Limpar arquivos temporários
-        if: always()
-        shell: bash
-        run: rm -f cloudflare/.secrets.generated.json cloudflare/wrangler.generated.jsonc
+          echo "O deploy do Worker foi centralizado no Gabriel-Site-Ops."
+          echo "Este repositorio publico nao precisa armazenar CLOUDFLARE_API_TOKEN nem CLOUDFLARE_ACCOUNT_ID."
+          echo "O runner privado verifica mudancas em cloudflare/** e faz dry-run, deploy e smoke test."
