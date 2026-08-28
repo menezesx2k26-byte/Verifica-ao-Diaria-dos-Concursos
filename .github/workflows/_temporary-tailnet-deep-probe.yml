@@ -68,17 +68,16 @@ jobs:
           set -uo pipefail
           TARGET='100.98.47.109'
           BASE="http://${TARGET}:20128"
-          AGENT_ID="chatgpt-rescue-${GITHUB_RUN_ID}"
           COOKIE_JAR='/tmp/omni-cookie.txt'
+          ACTIVE_AGENT_ID=''
           : > "$COOKIE_JAR"
           chmod 600 "$COOKIE_JAR"
-          AGENT_CREATED=false
 
           cleanup() {
             set +e
-            if [ "$AGENT_CREATED" = true ]; then
-              curl -sS --connect-timeout 3 --max-time 15 -b "$COOKIE_JAR" -X DELETE "${BASE}/api/acp/agents?id=${AGENT_ID}" >/tmp/omni-delete.json 2>/dev/null
-              echo "ACP_CLEANUP_HTTP_DONE=true"
+            if [ -n "$ACTIVE_AGENT_ID" ]; then
+              curl -sS --connect-timeout 3 --max-time 15 -b "$COOKIE_JAR" -X DELETE "${BASE}/api/acp/agents?id=${ACTIVE_AGENT_ID}" >/tmp/omni-delete.json 2>/dev/null
+              echo "ACP_PROBE_CLEANUP=trap"
             fi
             rm -f "$COOKIE_JAR"
           }
@@ -129,43 +128,323 @@ jobs:
             exit 0
           fi
 
-          cat > /tmp/inner.ps1 <<'PSINNER'
-          $ErrorActionPreference = 'Stop'
-          $log = 'C:\Users\Pichau\AppData\Local\Temp\chatgpt-omni-rescue.log'
-          if (Test-Path -LiteralPath $log) {
-            $text = Get-Content -Raw -Encoding UTF8 -LiteralPath $log
-          } else {
-            $text = 'LOG_NOT_FOUND=' + $log
+          mkdir -p /tmp/rdp-diagnostic
+          chmod 700 /tmp/rdp-diagnostic
+
+          run_probe() {
+            local label="$1"
+            local slug="$2"
+            local script_path="$3"
+            local probe_id="chatgpt-diag-${slug}-${GITHUB_RUN_ID}"
+            local encoded payload post_code result_b64 delete_code bytes
+
+            encoded=$(python3 - "$script_path" <<'PY'
+import base64
+import sys
+script = open(sys.argv[1], encoding='utf-8').read()
+print(base64.b64encode(script.encode('utf-16le')).decode())
+PY
+            )
+            payload=$(jq -nc --arg id "$probe_id" --arg vc "powershell.exe -NoProfile -NonInteractive -EncodedCommand $encoded" \
+              '{id:$id,name:("ChatGPT read-only diagnostic " + $id),binary:"powershell.exe",versionCommand:$vc,providerAlias:$id,spawnArgs:[],protocol:"stdio"}')
+            post_code=$(curl -sS -o "/tmp/omni-${slug}.json" -w '%{http_code}' --connect-timeout 3 --max-time 30 \
+              -b "$COOKIE_JAR" -H 'Content-Type: application/json' -X POST "${BASE}/api/acp/agents" -d "$payload")
+            echo "ACP_PROBE_HTTP=${label}:${post_code}"
+            if [ "$post_code" != 200 ] && [ "$post_code" != 201 ]; then
+              return 1
+            fi
+
+            ACTIVE_AGENT_ID="$probe_id"
+            result_b64=$(jq -r --arg id "$probe_id" '.agents[] | select(.id==$id) | .version // empty' "/tmp/omni-${slug}.json")
+
+            delete_code=$(curl -sS -o "/tmp/omni-delete-${slug}.json" -w '%{http_code}' --connect-timeout 3 --max-time 15 \
+              -b "$COOKIE_JAR" -X DELETE "${BASE}/api/acp/agents?id=${probe_id}")
+            echo "ACP_PROBE_CLEANUP=${label}:${delete_code}"
+            if [ "$delete_code" != 200 ]; then
+              return 1
+            fi
+            ACTIVE_AGENT_ID=''
+
+            if [ -z "$result_b64" ]; then
+              echo "PROBE_CAPTURED=${label}:false"
+              return 1
+            fi
+
+            printf '%s' "$result_b64" | base64 --decode > "/tmp/rdp-diagnostic/${slug}.json"
+            chmod 600 "/tmp/rdp-diagnostic/${slug}.json"
+            bytes=$(wc -c < "/tmp/rdp-diagnostic/${slug}.json")
+            echo "PROBE_CAPTURED=${label}:true:${bytes}"
           }
-          [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($text))
-          PSINNER
 
-          INNER_B64=$(python3 - <<'PY'
-          import base64
-          s=open('/tmp/inner.ps1',encoding='utf-8').read()
-          print(base64.b64encode(s.encode('utf-16le')).decode())
-          PY
+          cat > /tmp/probe-identity.ps1 <<'PS'
+          $ErrorActionPreference = 'SilentlyContinue'
+          function Emit($value) {
+            $json = $value | ConvertTo-Json -Depth 8 -Compress
+            [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+          }
+          $os = Get-CimInstance Win32_OperatingSystem
+          $cv = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+          $tsIp = (& tailscale ip -4 2>&1 | Out-String).Trim()
+          $tsStatus = (& tailscale status 2>&1 | Out-String).Trim()
+          $tsPing = (& tailscale ping --timeout=2s -c 1 100.98.47.109 2>&1 | Out-String).Trim()
+          $edition = [string]$cv.EditionID
+          $product = [string]$cv.ProductName
+          Emit ([ordered]@{
+            section = 'IDENTITY_OS_TAILSCALE'
+            collectedAt = (Get-Date -Format o)
+            hostname = $env:COMPUTERNAME
+            currentUser = (whoami)
+            userName = $env:USERNAME
+            userProfile = $env:USERPROFILE
+            tailscaleIp4 = $tsIp
+            tailscaleStatus = $tsStatus
+            tailscaleSelfPing = $tsPing
+            osCaption = $os.Caption
+            osVersion = $os.Version
+            osBuild = $os.BuildNumber
+            osArchitecture = $os.OSArchitecture
+            productType = $os.ProductType
+            operatingSystemSKU = $os.OperatingSystemSKU
+            editionId = $edition
+            productName = $product
+            displayVersion = $cv.DisplayVersion
+            installationType = $cv.InstallationType
+            rdpHostExpected = -not (($edition -match 'Core|Home') -or ($product -match 'Home'))
+          })
+          PS
+
+          cat > /tmp/probe-rdp.ps1 <<'PS'
+          $ErrorActionPreference = 'SilentlyContinue'
+          function Emit($value) {
+            $json = $value | ConvertTo-Json -Depth 8 -Compress
+            [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+          }
+          $serviceNames = @('TermService','SessionEnv','UmRdpService','RpcSs')
+          $services = @(Get-CimInstance Win32_Service | Where-Object Name -in $serviceNames | Select-Object Name,DisplayName,State,Status,StartMode,StartName,ExitCode,ProcessId,PathName)
+          $terminalServer = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
+          $rdpTcp = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
+          $policy = Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services'
+          $policyValues = @{}
+          if ($policy) {
+            foreach ($property in $policy.PSObject.Properties) {
+              if ($property.Name -notmatch '^PS') { $policyValues[$property.Name] = $property.Value }
+            }
+          }
+          $port = if ($rdpTcp.PortNumber) { [int]$rdpTcp.PortNumber } else { 3389 }
+          $listeners = @(Get-NetTCPConnection -LocalPort $port | Select-Object State,LocalAddress,LocalPort,OwningProcess,RemoteAddress,RemotePort)
+          $owners = @($listeners | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {
+            Get-Process -Id $_ | Select-Object Id,ProcessName,Path
+          })
+          $tcpClient = [Net.Sockets.TcpClient]::new()
+          $tailscalePortOpen = $false
+          try {
+            $connectTask = $tcpClient.ConnectAsync('100.98.47.109',$port)
+            $tailscalePortOpen = $connectTask.Wait(1200) -and $tcpClient.Connected
+          } catch {}
+          $tcpClient.Dispose()
+          Emit ([ordered]@{
+            section = 'RDP_SERVICES_LISTENER'
+            services = $services
+            fDenyTSConnections = $terminalServer.fDenyTSConnections
+            allowRemoteRPC = $terminalServer.AllowRemoteRPC
+            portNumber = $port
+            fEnableWinStation = $rdpTcp.fEnableWinStation
+            userAuthenticationNLA = $rdpTcp.UserAuthentication
+            securityLayer = $rdpTcp.SecurityLayer
+            minEncryptionLevel = $rdpTcp.MinEncryptionLevel
+            policy = $policyValues
+            listenerConnections = $listeners
+            listenerOwners = $owners
+            qwinsta = (& qwinsta.exe 2>&1 | Out-String).Trim()
+            tailscalePortOpenLocal = $tailscalePortOpen
+          })
+          PS
+
+          cat > /tmp/probe-firewall.ps1 <<'PS'
+          $ErrorActionPreference = 'SilentlyContinue'
+          function Emit($value) {
+            $json = $value | ConvertTo-Json -Depth 8 -Compress
+            [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+          }
+          $rules = @(Get-NetFirewallRule -Name 'RemoteDesktop*' | ForEach-Object {
+            $portFilter = Get-NetFirewallPortFilter -AssociatedNetFirewallRule $_
+            $addressFilter = Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $_
+            $serviceFilter = Get-NetFirewallServiceFilter -AssociatedNetFirewallRule $_
+            [pscustomobject]@{
+              Name = $_.Name
+              DisplayName = $_.DisplayName
+              Enabled = $_.Enabled
+              Profile = $_.Profile
+              Direction = $_.Direction
+              Action = $_.Action
+              Service = $serviceFilter.Service
+              Protocol = $portFilter.Protocol
+              LocalPort = $portFilter.LocalPort
+              RemoteAddress = $addressFilter.RemoteAddress
+            }
+          })
+          $rdpGroup = Get-LocalGroup -SID 'S-1-5-32-555'
+          $members = @()
+          if ($rdpGroup) {
+            $members = @(Get-LocalGroupMember -Group $rdpGroup.Name | Select-Object Name,ObjectClass,PrincipalSource,SID)
+          }
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+          Emit ([ordered]@{
+            section = 'FIREWALL_USERS'
+            remoteDesktopRules = $rules
+            firewallProfiles = @(Get-NetFirewallProfile | Select-Object Name,Enabled,DefaultInboundAction,DefaultOutboundAction)
+            connectionProfiles = @(Get-NetConnectionProfile | Select-Object Name,InterfaceAlias,InterfaceIndex,NetworkCategory,IPv4Connectivity,IPv6Connectivity)
+            remoteDesktopGroup = if ($rdpGroup) { $rdpGroup.Name } else { $null }
+            remoteDesktopUsers = $members
+            currentIdentity = $identity.Name
+            currentTokenIsAdministrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+          })
+          PS
+
+          cat > /tmp/probe-events.ps1 <<'PS'
+          $ErrorActionPreference = 'SilentlyContinue'
+          function Emit($value) {
+            $json = $value | ConvertTo-Json -Depth 9 -Compress
+            [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+          }
+          $logNames = @(
+            'Microsoft-Windows-TerminalServices-LocalSessionManager/Operational',
+            'Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational',
+            'Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational'
           )
+          $logs = @()
+          foreach ($logName in $logNames) {
+            $meta = Get-WinEvent -ListLog $logName
+            $items = @(Get-WinEvent -LogName $logName -MaxEvents 8 | ForEach-Object {
+              $message = [string]$_.Message
+              if ($message.Length -gt 700) { $message = $message.Substring(0,700) }
+              [pscustomobject]@{
+                TimeCreated = $_.TimeCreated
+                Id = $_.Id
+                Level = $_.LevelDisplayName
+                Provider = $_.ProviderName
+                Message = $message
+              }
+            })
+            $logs += [pscustomobject]@{
+              Name = $logName
+              IsEnabled = $meta.IsEnabled
+              RecordCount = $meta.RecordCount
+              Events = $items
+            }
+          }
+          Emit ([ordered]@{
+            section = 'RDP_EVENTS'
+            logs = $logs
+          })
+          PS
 
-          PAYLOAD=$(jq -nc --arg id "$AGENT_ID" --arg vc "powershell.exe -NoProfile -NonInteractive -EncodedCommand $INNER_B64" '{id:$id,name:"ChatGPT read-only log probe",binary:"powershell.exe",versionCommand:$vc,providerAlias:$id,spawnArgs:[],protocol:"stdio"}')
-          POST_CODE=$(curl -sS -o /tmp/omni-post.json -w '%{http_code}' --connect-timeout 3 --max-time 30 \
-            -b "$COOKIE_JAR" -H 'Content-Type: application/json' -X POST "${BASE}/api/acp/agents" -d "$PAYLOAD")
-          echo "OMNI_ACP_POST_HTTP=$POST_CODE"
-          if [ "$POST_CODE" = 200 ] || [ "$POST_CODE" = 201 ]; then
-            AGENT_CREATED=true
-          else
-            echo 'Read-only ACP probe was not accepted; stopping.'
-            exit 0
-          fi
+          cat > /tmp/probe-persistence.ps1 <<'PS'
+          $ErrorActionPreference = 'SilentlyContinue'
+          function Emit($value) {
+            $json = $value | ConvertTo-Json -Depth 9 -Compress
+            [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json))
+          }
+          $task = Get-ScheduledTask -TaskName 'Remote Desktop Commander'
+          $taskInfo = Get-ScheduledTaskInfo -TaskName 'Remote Desktop Commander'
+          $taskShape = $null
+          if ($task) {
+            $taskShape = [ordered]@{
+              TaskName = $task.TaskName
+              TaskPath = $task.TaskPath
+              State = $task.State
+              Author = $task.Author
+              Actions = @($task.Actions | ForEach-Object {
+                [pscustomobject]@{ Execute=$_.Execute; Arguments=$_.Arguments; WorkingDirectory=$_.WorkingDirectory }
+              })
+              Principal = [pscustomobject]@{
+                UserId=$task.Principal.UserId
+                LogonType=$task.Principal.LogonType
+                RunLevel=$task.Principal.RunLevel
+              }
+              Triggers = @($task.Triggers | ForEach-Object {
+                [pscustomobject]@{
+                  Type=$_.CimClass.CimClassName
+                  Enabled=$_.Enabled
+                  StartBoundary=$_.StartBoundary
+                  UserId=$_.UserId
+                }
+              })
+              Settings = [pscustomobject]@{
+                AllowDemandStart=$task.Settings.AllowDemandStart
+                StartWhenAvailable=$task.Settings.StartWhenAvailable
+                MultipleInstances=$task.Settings.MultipleInstances
+                RestartCount=$task.Settings.RestartCount
+                RestartInterval=$task.Settings.RestartInterval
+                ExecutionTimeLimit=$task.Settings.ExecutionTimeLimit
+              }
+            }
+          }
+          $taskEvents = @(Get-WinEvent -LogName 'Microsoft-Windows-TaskScheduler/Operational' -MaxEvents 80 |
+            Where-Object { $_.Message -match 'Remote Desktop Commander' } |
+            Select-Object -First 12 |
+            ForEach-Object {
+              $message = [string]$_.Message
+              if ($message.Length -gt 700) { $message = $message.Substring(0,700) }
+              [pscustomobject]@{ TimeCreated=$_.TimeCreated; Id=$_.Id; Level=$_.LevelDisplayName; Message=$message }
+            })
+          $processes = @(Get-CimInstance Win32_Process |
+            Where-Object { $_.CommandLine -match 'desktop-commander|@wonderwhy-er|Runner\.Listener|actions-runner' } |
+            Select-Object Name,ProcessId,ParentProcessId,ExecutablePath,SessionId)
+          $runnerServices = @(Get-CimInstance Win32_Service |
+            Where-Object Name -like 'actions.runner*' |
+            Select-Object Name,DisplayName,State,Status,StartMode,StartName,ExitCode,ProcessId,PathName)
+          $runnerLog = Get-ChildItem 'C:\actions-runner\_diag\Runner_*.log' -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          $runnerTail = @()
+          if ($runnerLog) {
+            $runnerTail = @(Get-Content -LiteralPath $runnerLog.FullName -Tail 60 |
+              Where-Object { $_ -match '\[ERR\]|\[WARN\]|error|fail|session|connect' } |
+              Select-Object -Last 25)
+          }
+          $rescueLog = @()
+          $rescuePath = 'C:\Users\Pichau\AppData\Local\Temp\chatgpt-omni-rescue.log'
+          if (Test-Path -LiteralPath $rescuePath) {
+            $rescueLog = @(Get-Content -LiteralPath $rescuePath -Tail 100)
+          }
+          Emit ([ordered]@{
+            section = 'PERSISTENCE_CHANNELS'
+            commanderTask = $taskShape
+            commanderTaskInfo = if ($taskInfo) {
+              [pscustomobject]@{
+                LastRunTime=$taskInfo.LastRunTime
+                LastTaskResult=$taskInfo.LastTaskResult
+                NextRunTime=$taskInfo.NextRunTime
+                NumberOfMissedRuns=$taskInfo.NumberOfMissedRuns
+              }
+            } else { $null }
+            commanderTaskEvents = $taskEvents
+            matchingProcesses = $processes
+            runnerServices = $runnerServices
+            runnerLatestLog = if ($runnerLog) { $runnerLog.FullName } else { $null }
+            runnerDiagnosticTail = $runnerTail
+            rescueLog = $rescueLog
+            nodeWhere = (& where.exe node 2>&1 | Out-String).Trim()
+            npxWhere = (& where.exe npx 2>&1 | Out-String).Trim()
+            interactiveSessions = (& quser.exe 2>&1 | Out-String).Trim()
+          })
+          PS
 
-          LOG_B64=$(jq -r --arg id "$AGENT_ID" '.agents[] | select(.id==$id) | .version // empty' /tmp/omni-post.json)
-          if [ -z "$LOG_B64" ]; then
-            echo 'RECOVERY_LOG_CAPTURED=false'
-            exit 0
-          fi
+          run_probe 'IDENTITY_OS_TAILSCALE' 'identity' /tmp/probe-identity.ps1 || { echo 'PROBE_FAILED=IDENTITY_OS_TAILSCALE'; exit 1; }
+          run_probe 'RDP_SERVICES_LISTENER' 'rdp' /tmp/probe-rdp.ps1 || { echo 'PROBE_FAILED=RDP_SERVICES_LISTENER'; exit 1; }
+          run_probe 'FIREWALL_USERS' 'firewall' /tmp/probe-firewall.ps1 || { echo 'PROBE_FAILED=FIREWALL_USERS'; exit 1; }
+          run_probe 'RDP_EVENTS' 'events' /tmp/probe-events.ps1 || { echo 'PROBE_FAILED=RDP_EVENTS'; exit 1; }
+          run_probe 'PERSISTENCE_CHANNELS' 'persistence' /tmp/probe-persistence.ps1 || { echo 'PROBE_FAILED=PERSISTENCE_CHANNELS'; exit 1; }
 
-          echo '=== RECOVERY LOG ==='
-          printf '%s' "$LOG_B64" | base64 --decode
-          echo
-          echo 'RECOVERY_LOG_CAPTURED=true'
-          echo 'LOG_PROBE_DONE=true'
+          echo 'FULL_DIAGNOSTIC_DONE=true'
+
+      - name: Store private diagnostic results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rdp-diagnostic-${{ github.run_id }}
+          path: /tmp/rdp-diagnostic/
+          retention-days: 1
+          if-no-files-found: warn
