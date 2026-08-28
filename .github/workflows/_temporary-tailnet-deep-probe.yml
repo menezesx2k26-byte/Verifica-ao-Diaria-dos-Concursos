@@ -13,7 +13,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Install tools
         shell: bash
@@ -22,15 +22,14 @@ jobs:
           curl -fsSL https://tailscale.com/install.sh | sh >/dev/null
           sudo systemctl enable --now tailscaled >/dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y -qq nmap smbclient samba-common-bin openssl >/dev/null
+          sudo apt-get install -y -qq nmap smbclient samba-common-bin openssl python3-impacket nbtscan >/dev/null
 
       - name: Start interactive tailnet login privately
-        id: login
         shell: bash
         run: |
           set -euo pipefail
           rm -f /tmp/ts-login.txt /tmp/auth-url.txt
-          (sudo tailscale up --hostname="gh-deep-${GITHUB_RUN_ID}" --accept-dns=false > /tmp/ts-login.txt 2>&1) &
+          (sudo tailscale up --hostname="gh-final-${GITHUB_RUN_ID}" --accept-dns=true > /tmp/ts-login.txt 2>&1) &
           echo $! > /tmp/ts-up.pid
           for i in $(seq 1 60); do
             URL=$(grep -Eo 'https://login\.tailscale\.com/a/[A-Za-z0-9_-]+' /tmp/ts-login.txt | head -1 || true)
@@ -47,7 +46,7 @@ jobs:
       - name: Store private login handoff
         uses: actions/upload-artifact@v4
         with:
-          name: tailscale-deep-auth-${{ github.run_id }}
+          name: tailscale-final-auth-${{ github.run_id }}
           path: /tmp/auth-url.txt
           retention-days: 1
           if-no-files-found: error
@@ -60,31 +59,58 @@ jobs:
             STATE=$(sudo tailscale status --json 2>/dev/null | jq -r '.BackendState // empty' || true)
             if [ "$STATE" = 'Running' ]; then
               echo 'TAILSCALE_AUTHORIZED=true'
+              sudo tailscale status
               exit 0
             fi
             sleep 5
           done
           exit 1
 
-      - name: Deep identify target services
+      - name: Exhaustive recovery probe
         shell: bash
         run: |
           set +e
           TARGET=100.98.47.109
+          FQDN=$(sudo tailscale status --json | jq -r --arg ip "$TARGET" '.Peer | to_entries[] | select(.value.TailscaleIPs[]? == $ip) | .value.DNSName' | sed 's/\.$//' | head -1)
+          echo "TARGET=$TARGET"
+          echo "FQDN=$FQDN"
+
           echo '=== TAILSCALE PING ==='
           sudo tailscale ping --timeout=5s -c 2 "$TARGET"
-          echo '=== NMAP SERVICE DETECTION ==='
-          sudo nmap -Pn -sV --version-light -p 135,139,443,445,3389,5985,5986,47001,49664-49675 "$TARGET"
-          echo '=== SMB NSE ==='
-          sudo nmap -Pn -p 445 --script smb2-capabilities,smb2-security-mode,smb2-time,smb-os-discovery "$TARGET"
-          echo '=== SMB GUEST SHARE LIST ==='
+
+          echo '=== NETBIOS ==='
+          nbtscan -v "$TARGET" 2>&1
+          nmblookup -A "$TARGET" 2>&1
+
+          echo '=== ALL TCP OPEN PORTS ==='
+          sudo nmap -Pn -sT -p- --open -T4 --max-retries 1 --host-timeout 8m "$TARGET" 2>&1
+
+          echo '=== TARGETED SERVICE DETECTION ==='
+          sudo nmap -Pn -sT -sV --version-all -p 135,139,443,445,3389,5985,5986,47001,49664-49720 "$TARGET" 2>&1
+
+          echo '=== RPC ENDPOINT MAPPER ==='
+          if command -v rpcdump.py >/dev/null 2>&1; then rpcdump.py "@$TARGET" 2>&1 | head -n 500; fi
+          if command -v impacket-rpcdump >/dev/null 2>&1; then impacket-rpcdump "@$TARGET" 2>&1 | head -n 500; fi
+
+          echo '=== SMB NEGOTIATION ==='
+          sudo nmap -Pn -p445 --script smb-protocols,smb2-capabilities,smb2-security-mode,smb2-time "$TARGET" 2>&1
           smbclient -L "//$TARGET" -N 2>&1
-          echo '=== RPC NULL SESSION INFO ==='
-          rpcclient -U '' -N "$TARGET" -c 'srvinfo;enumdomains;netshareenum' 2>&1
-          echo '=== HTTPS HEADERS ==='
-          curl -k -sS -D - -o /dev/null --connect-timeout 5 --max-time 10 "https://$TARGET/" 2>&1
-          echo '=== HTTPS BODY PREFIX ==='
-          curl -k -sS --connect-timeout 5 --max-time 10 "https://$TARGET/" 2>&1 | head -c 2000
-          echo
-          echo '=== TLS CERTIFICATE ==='
-          timeout 8 bash -c "echo | openssl s_client -connect $TARGET:443 -servername desktop-l6citui 2>/dev/null | openssl x509 -noout -subject -issuer -serial -dates -ext subjectAltName" 2>&1
+
+          echo '=== 443 PLAIN HTTP ==='
+          curl -v --connect-timeout 5 --max-time 10 "http://$TARGET:443/" 2>&1 | head -n 120
+
+          echo '=== 443 HTTPS BY IP ==='
+          curl -k -v --connect-timeout 5 --max-time 10 "https://$TARGET/" 2>&1 | head -n 160
+
+          if [ -n "$FQDN" ] && [ "$FQDN" != "null" ]; then
+            echo '=== 443 HTTPS WITH MAGICDNS/SNI ==='
+            curl -k -v --resolve "$FQDN:443:$TARGET" --connect-timeout 5 --max-time 15 "https://$FQDN/" 2>&1 | head -n 240
+
+            echo '=== TLS WITH MAGICDNS/SNI ==='
+            timeout 10 openssl s_client -connect "$TARGET:443" -servername "$FQDN" -alpn 'h2,http/1.1' -showcerts </dev/null 2>&1 | head -n 240
+          fi
+
+          echo '=== UDP 443 QUICK CHECK ==='
+          sudo nmap -Pn -sU -p443 --version-light --host-timeout 90s "$TARGET" 2>&1
+
+          echo '=== DONE ==='
