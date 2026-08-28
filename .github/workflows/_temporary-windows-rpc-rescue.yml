@@ -1,0 +1,139 @@
+name: Temporary Windows RPC rescue
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/_temporary-windows-rpc-rescue.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rescue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate secret
+        shell: bash
+        env:
+          WINDOWS_RESCUE_PASSWORD: ${{ secrets.WINDOWS_RESCUE_PASSWORD }}
+        run: |
+          test -n "$WINDOWS_RESCUE_PASSWORD" || { echo 'WINDOWS_RESCUE_PASSWORD is missing'; exit 2; }
+
+      - name: Install tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://tailscale.com/install.sh | sh >/dev/null
+          sudo systemctl enable --now tailscaled >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-impacket smbclient jq >/dev/null
+          if command -v impacket-atexec >/dev/null 2>&1; then
+            echo "ATEXEC=impacket-atexec" >> "$GITHUB_ENV"
+          elif command -v atexec.py >/dev/null 2>&1; then
+            echo "ATEXEC=atexec.py" >> "$GITHUB_ENV"
+          elif [ -f /usr/share/doc/python3-impacket/examples/atexec.py ]; then
+            echo "ATEXEC=python3 /usr/share/doc/python3-impacket/examples/atexec.py" >> "$GITHUB_ENV"
+          else
+            python3 -m pip install --user --break-system-packages -q impacket
+            BIN="$(command -v impacket-atexec || command -v atexec.py || true)"
+            test -n "$BIN" || { echo 'atexec still unavailable'; exit 3; }
+            echo "ATEXEC=$BIN" >> "$GITHUB_ENV"
+          fi
+
+      - name: Start private tailnet login
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f /tmp/ts-login.txt /tmp/auth-url.txt
+          (sudo tailscale up --hostname="gh-rpc-rescue-${GITHUB_RUN_ID}" --accept-dns=true > /tmp/ts-login.txt 2>&1) &
+          for i in $(seq 1 60); do
+            URL=$(grep -Eo 'https://login\.tailscale\.com/a/[A-Za-z0-9_-]+' /tmp/ts-login.txt | head -1 || true)
+            if [ -n "$URL" ]; then
+              echo "::add-mask::$URL"
+              printf '%s\n' "$URL" > /tmp/auth-url.txt
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Store login handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: tailscale-rpc-rescue-auth-${{ github.run_id }}
+          path: /tmp/auth-url.txt
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Wait for tailnet authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            STATE=$(sudo tailscale status --json 2>/dev/null | jq -r '.BackendState // empty' || true)
+            if [ "$STATE" = 'Running' ]; then
+              echo 'TAILSCALE_AUTHORIZED=true'
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Authenticate and recover Windows services
+        shell: bash
+        env:
+          WINDOWS_RESCUE_PASSWORD: ${{ secrets.WINDOWS_RESCUE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TARGET='100.98.47.109'
+          USER='DESKTOP-L6CITUI/Pichau'
+
+          run_atexec() {
+            if [[ "$ATEXEC" == python3\ * ]]; then
+              python3 /usr/share/doc/python3-impacket/examples/atexec.py "$@"
+            else
+              "$ATEXEC" "$@"
+            fi
+          }
+
+          echo '=== AUTH CHECK ==='
+          smbclient -L "//$TARGET" -U "DESKTOP-L6CITUI\\Pichau%${WINDOWS_RESCUE_PASSWORD}" -m SMB3 -g >/tmp/smb-auth.txt 2>&1 || {
+            sed -E 's/(NT_STATUS_[A-Z_]+)/AUTH_ERROR=\1/g' /tmp/smb-auth.txt | head -n 20
+            exit 4
+          }
+          echo 'SMB_AUTH=OK'
+
+          cat > /tmp/rescue.ps1 <<'PS'
+          $ErrorActionPreference='Continue'
+          $log='C:\ProgramData\ChatGPT\rescue-last.txt'
+          New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null
+          "START=$(Get-Date -Format o)" | Set-Content $log
+          try { Set-Service Tailscale -StartupType Automatic; Start-Service Tailscale; 'TAILSCALE=OK' | Out-File $log -Append } catch { $_ | Out-File $log -Append }
+          Get-Service | Where-Object Name -like 'actions.runner*' | ForEach-Object {
+            try { Set-Service $_.Name -StartupType Automatic; Start-Service $_.Name; "RUNNER=$($_.Name):$((Get-Service $_.Name).Status)" | Out-File $log -Append } catch { $_ | Out-File $log -Append }
+          }
+          try { Start-ScheduledTask -TaskName 'Remote Desktop Commander'; 'COMMANDER_TASK_STARTED=true' | Out-File $log -Append } catch { $_ | Out-File $log -Append }
+          $ts='HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
+          try { Set-ItemProperty $ts -Name fDenyTSConnections -Value 0 -Type DWord } catch { $_ | Out-File $log -Append }
+          try { Set-Service TermService -StartupType Automatic; Start-Service TermService } catch { $_ | Out-File $log -Append }
+          try { Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'RemoteDesktop*' -or $_.Service -eq 'TermService' } | Enable-NetFirewallRule } catch { $_ | Out-File $log -Append }
+          Start-Sleep -Seconds 3
+          "RDP_LISTENING=$([bool](Get-NetTCPConnection -LocalPort 3389 -State Listen -ErrorAction SilentlyContinue))" | Out-File $log -Append
+          "END=$(Get-Date -Format o)" | Out-File $log -Append
+          PS
+
+          B64=$(python3 - <<'PY'
+          import base64
+          s=open('/tmp/rescue.ps1','r',encoding='utf-8').read()
+          print(base64.b64encode(s.encode('utf-16le')).decode())
+          PY
+          )
+
+          run_atexec "$USER:${WINDOWS_RESCUE_PASSWORD}@$TARGET" "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $B64"
+          sleep 20
+          echo '=== POST RESCUE ==='
+          timeout 5 bash -c "</dev/tcp/$TARGET/3389" && echo 'RDP_PORT=OPEN' || echo 'RDP_PORT=CLOSED'
+          timeout 5 bash -c "</dev/tcp/$TARGET/445" && echo 'SMB_PORT=OPEN' || echo 'SMB_PORT=CLOSED'
