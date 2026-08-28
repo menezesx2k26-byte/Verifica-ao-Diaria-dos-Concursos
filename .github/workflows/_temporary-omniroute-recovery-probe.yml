@@ -1,0 +1,103 @@
+name: Temporary OmniRoute recovery probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/_temporary-omniroute-recovery-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install Tailscale
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://tailscale.com/install.sh | sh >/dev/null
+          sudo systemctl enable --now tailscaled >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq curl >/dev/null
+
+      - name: Start private tailnet login
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f /tmp/ts-login.txt /tmp/auth-url.txt
+          (sudo tailscale up --hostname="gh-omni-recovery-${GITHUB_RUN_ID}" --accept-dns=true > /tmp/ts-login.txt 2>&1) &
+          for i in $(seq 1 60); do
+            URL=$(grep -Eo 'https://login\.tailscale\.com/a/[A-Za-z0-9_-]+' /tmp/ts-login.txt | head -1 || true)
+            if [ -n "$URL" ]; then
+              echo "::add-mask::$URL"
+              printf '%s\n' "$URL" > /tmp/auth-url.txt
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Store login handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: tailscale-omni-recovery-auth-${{ github.run_id }}
+          path: /tmp/auth-url.txt
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Wait for tailnet authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            STATE=$(sudo tailscale status --json 2>/dev/null | jq -r '.BackendState // empty' || true)
+            if [ "$STATE" = 'Running' ]; then
+              echo 'TAILSCALE_AUTHORIZED=true'
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Probe supported OmniRoute recovery surfaces
+        shell: bash
+        run: |
+          set +e
+          BASE='http://100.98.47.109:20128'
+          echo '=== OMNIROUTE ENDPOINT STATUS ==='
+          for path in \
+            '/api/settings/require-login' \
+            '/api/settings' \
+            '/api/keys' \
+            '/api/acp/agents' \
+            '/api/mcp/status' \
+            '/api/mcp/tools' \
+            '/api/monitoring/health' \
+            '/.well-known/agent.json' \
+            '/api/cli-tools/codex-settings' \
+            '/api/cli-tools/runtime/codex'; do
+              echo "--- $path ---"
+              curl -sS -i --connect-timeout 4 --max-time 12 "$BASE$path" | head -c 5000
+              echo
+          done
+
+          echo '=== A2A HEALTH REPORT ==='
+          curl -sS -i --connect-timeout 4 --max-time 20 \
+            -H 'content-type: application/json' \
+            -d '{"jsonrpc":"2.0","id":"recovery","method":"message/send","params":{"skill":"health-report","messages":[{"role":"user","content":"Return current OmniRoute health only."}]}}' \
+            "$BASE/a2a" | head -c 5000
+          echo
+
+          echo '=== MCP REMOTE INITIALIZE WITHOUT KEY ==='
+          curl -sS -i --connect-timeout 4 --max-time 15 \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"recovery-probe","version":"1"}}}' \
+            "$BASE/api/mcp/stream" | head -c 5000
+          echo
+
+          echo '=== DONE ==='
