@@ -139,11 +139,11 @@ jobs:
             local encoded payload post_code result_b64 delete_code bytes
 
             encoded=$(python3 - "$script_path" <<'PY'
-import base64
-import sys
-script = open(sys.argv[1], encoding='utf-8').read()
-print(base64.b64encode(script.encode('utf-16le')).decode())
-PY
+          import base64
+          import sys
+          script = open(sys.argv[1], encoding='utf-8').read()
+          print(base64.b64encode(script.encode('utf-16le')).decode())
+          PY
             )
             payload=$(jq -nc --arg id "$probe_id" --arg vc "powershell.exe -NoProfile -NonInteractive -EncodedCommand $encoded" \
               '{id:$id,name:("ChatGPT read-only diagnostic " + $id),binary:"powershell.exe",versionCommand:$vc,providerAlias:$id,spawnArgs:[],protocol:"stdio"}')
