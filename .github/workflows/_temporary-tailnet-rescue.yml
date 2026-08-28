@@ -1,0 +1,90 @@
+name: Temporary tailnet rescue bridge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/_temporary-tailnet-rescue.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rescue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install Tailscale
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://tailscale.com/install.sh | sh >/dev/null
+          sudo systemctl enable --now tailscaled >/dev/null
+          tailscale version
+
+      - name: Start interactive tailnet login without exposing URL
+        id: login
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f /tmp/ts-login.txt /tmp/auth-url.txt
+          (sudo tailscale up --hostname="gh-rescue-${GITHUB_RUN_ID}" --accept-dns=false > /tmp/ts-login.txt 2>&1) &
+          echo $! > /tmp/ts-up.pid
+          for i in $(seq 1 60); do
+            URL=$(grep -Eo 'https://login\.tailscale\.com/a/[A-Za-z0-9_-]+' /tmp/ts-login.txt | head -1 || true)
+            if [ -n "$URL" ]; then
+              echo "::add-mask::$URL"
+              printf '%s\n' "$URL" > /tmp/auth-url.txt
+              echo 'TAILSCALE_AUTH_URL_CAPTURED=true'
+              exit 0
+            fi
+            if ! kill -0 "$(cat /tmp/ts-up.pid)" 2>/dev/null; then
+              echo 'tailscale up exited before producing a login URL'
+              sed -E 's#https://login\.tailscale\.com/a/[A-Za-z0-9_-]+#[MASKED]#g' /tmp/ts-login.txt
+              exit 1
+            fi
+            sleep 1
+          done
+          echo 'Timed out waiting for Tailscale login URL'
+          exit 1
+
+      - name: Store private login handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: tailscale-auth-url-${{ github.run_id }}
+          path: /tmp/auth-url.txt
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Wait for authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            STATE=$(sudo tailscale status --json 2>/dev/null | jq -r '.BackendState // empty' || true)
+            if [ "$STATE" = 'Running' ]; then
+              echo 'TAILSCALE_AUTHORIZED=true'
+              sudo tailscale status
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Authorization timeout'
+          exit 1
+
+      - name: Probe Windows management channels
+        shell: bash
+        run: |
+          set +e
+          TARGET=100.98.47.109
+          echo '=== TAILSCALE PING ==='
+          sudo tailscale ping --timeout=5s -c 3 "$TARGET"
+          echo '=== TCP PORTS ==='
+          for p in 22 80 135 139 443 445 3389 5985 5986 5900 7070 21115 21116 21117 21118 21119; do
+            if timeout 3 bash -c "</dev/tcp/$TARGET/$p" 2>/dev/null; then
+              echo "PORT_${p}=OPEN"
+            else
+              echo "PORT_${p}=CLOSED_OR_FILTERED"
+            fi
+          done
