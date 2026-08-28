@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
 
+# Triggered after WINDOWS_RESCUE_PASSWORD was configured.
 jobs:
   rescue:
     runs-on: ubuntu-latest
