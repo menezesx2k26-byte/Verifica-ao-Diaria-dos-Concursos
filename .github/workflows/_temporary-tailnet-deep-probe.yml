@@ -1,0 +1,90 @@
+name: Temporary tailnet deep probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/_temporary-tailnet-deep-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://tailscale.com/install.sh | sh >/dev/null
+          sudo systemctl enable --now tailscaled >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nmap smbclient samba-common-bin openssl >/dev/null
+
+      - name: Start interactive tailnet login privately
+        id: login
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f /tmp/ts-login.txt /tmp/auth-url.txt
+          (sudo tailscale up --hostname="gh-deep-${GITHUB_RUN_ID}" --accept-dns=false > /tmp/ts-login.txt 2>&1) &
+          echo $! > /tmp/ts-up.pid
+          for i in $(seq 1 60); do
+            URL=$(grep -Eo 'https://login\.tailscale\.com/a/[A-Za-z0-9_-]+' /tmp/ts-login.txt | head -1 || true)
+            if [ -n "$URL" ]; then
+              echo "::add-mask::$URL"
+              printf '%s\n' "$URL" > /tmp/auth-url.txt
+              echo 'TAILSCALE_AUTH_URL_CAPTURED=true'
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Store private login handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: tailscale-deep-auth-${{ github.run_id }}
+          path: /tmp/auth-url.txt
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Wait for authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            STATE=$(sudo tailscale status --json 2>/dev/null | jq -r '.BackendState // empty' || true)
+            if [ "$STATE" = 'Running' ]; then
+              echo 'TAILSCALE_AUTHORIZED=true'
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Deep identify target services
+        shell: bash
+        run: |
+          set +e
+          TARGET=100.98.47.109
+          echo '=== TAILSCALE PING ==='
+          sudo tailscale ping --timeout=5s -c 2 "$TARGET"
+          echo '=== NMAP SERVICE DETECTION ==='
+          sudo nmap -Pn -sV --version-light -p 135,139,443,445,3389,5985,5986,47001,49664-49675 "$TARGET"
+          echo '=== SMB NSE ==='
+          sudo nmap -Pn -p 445 --script smb2-capabilities,smb2-security-mode,smb2-time,smb-os-discovery "$TARGET"
+          echo '=== SMB GUEST SHARE LIST ==='
+          smbclient -L "//$TARGET" -N 2>&1
+          echo '=== RPC NULL SESSION INFO ==='
+          rpcclient -U '' -N "$TARGET" -c 'srvinfo;enumdomains;netshareenum' 2>&1
+          echo '=== HTTPS HEADERS ==='
+          curl -k -sS -D - -o /dev/null --connect-timeout 5 --max-time 10 "https://$TARGET/" 2>&1
+          echo '=== HTTPS BODY PREFIX ==='
+          curl -k -sS --connect-timeout 5 --max-time 10 "https://$TARGET/" 2>&1 | head -c 2000
+          echo
+          echo '=== TLS CERTIFICATE ==='
+          timeout 8 bash -c "echo | openssl s_client -connect $TARGET:443 -servername desktop-l6citui 2>/dev/null | openssl x509 -noout -subject -issuer -serial -dates -ext subjectAltName" 2>&1
