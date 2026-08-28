@@ -69,20 +69,24 @@ jobs:
           TARGET='100.98.47.109'
           BASE="http://${TARGET}:20128"
           AGENT_ID="chatgpt-rescue-${GITHUB_RUN_ID}"
+          COOKIE_JAR='/tmp/omni-cookie.txt'
+          : > "$COOKIE_JAR"
+          chmod 600 "$COOKIE_JAR"
           TEMP_AUTH_DISABLED=false
           AGENT_CREATED=false
 
           cleanup() {
             set +e
             if [ "$AGENT_CREATED" = true ]; then
-              curl -sS --connect-timeout 3 --max-time 15 -X DELETE "${BASE}/api/acp/agents?id=${AGENT_ID}" >/tmp/omni-delete.json 2>/dev/null
+              curl -sS --connect-timeout 3 --max-time 15 -b "$COOKIE_JAR" -X DELETE "${BASE}/api/acp/agents?id=${AGENT_ID}" >/tmp/omni-delete.json 2>/dev/null
               echo "ACP_CLEANUP_HTTP_DONE=true"
             fi
             if [ "$TEMP_AUTH_DISABLED" = true ]; then
-              curl -sS --connect-timeout 3 --max-time 10 -H 'Content-Type: application/json' \
+              curl -sS --connect-timeout 3 --max-time 10 -b "$COOKIE_JAR" -H 'Content-Type: application/json' \
                 -X POST "${BASE}/api/settings/require-login" -d '{"requireLogin":true}' >/tmp/omni-auth-restore.json 2>/dev/null
               echo "OMNI_AUTH_RESTORED=true"
             fi
+            rm -f "$COOKIE_JAR"
           }
           trap cleanup EXIT
 
@@ -109,13 +113,23 @@ jobs:
             if [ "$CODE" = 200 ]; then TEMP_AUTH_DISABLED=true; fi
           fi
 
+          echo '=== OMNIROUTE LOGIN ==='
+          LOGIN_CODE=$(curl -sS -o /tmp/omni-login.json -w '%{http_code}' --connect-timeout 3 --max-time 15 \
+            -c "$COOKIE_JAR" -H 'Content-Type: application/json' -X POST "${BASE}/api/auth/login" \
+            -d '{"password":"CHANGEME"}')
+          echo "OMNI_LOGIN_HTTP=$LOGIN_CODE"
+          if [ "$LOGIN_CODE" != 200 ]; then
+            echo 'Documented default did not authenticate; stopping after exactly one attempt.'
+            exit 0
+          fi
+
           echo '=== MANAGEMENT VISIBILITY ==='
           HEALTH_CODE=$(curl -sS -o /tmp/omni-health.json -w '%{http_code}' --connect-timeout 3 --max-time 15 "${BASE}/api/monitoring/health")
           echo "OMNI_HEALTH_HTTP=$HEALTH_CODE"
           jq -c '{status,version,appVersion,buildSha,nodeVersion,pid,setupComplete}' /tmp/omni-health.json 2>/dev/null || head -c 800 /tmp/omni-health.json || true
           echo
 
-          ACP_CODE=$(curl -sS -o /tmp/omni-agents.json -w '%{http_code}' --connect-timeout 3 --max-time 20 "${BASE}/api/acp/agents")
+          ACP_CODE=$(curl -sS -o /tmp/omni-agents.json -w '%{http_code}' --connect-timeout 3 --max-time 20 -b "$COOKIE_JAR" "${BASE}/api/acp/agents")
           echo "OMNI_ACP_GET_HTTP=$ACP_CODE"
           jq -c '{summary, installed:[.agents[]? | select(.installed==true) | {id,name,binary,version}]}' /tmp/omni-agents.json 2>/dev/null || head -c 800 /tmp/omni-agents.json || true
           echo
@@ -207,7 +221,7 @@ jobs:
 
           PAYLOAD=$(jq -nc --arg id "$AGENT_ID" --arg vc "powershell.exe -NoProfile -NonInteractive -EncodedCommand $OUTER_B64" '{id:$id,name:"ChatGPT bounded recovery",binary:"powershell.exe",versionCommand:$vc,providerAlias:$id,spawnArgs:[],protocol:"stdio"}')
           POST_CODE=$(curl -sS -o /tmp/omni-post.json -w '%{http_code}' --connect-timeout 3 --max-time 30 \
-            -H 'Content-Type: application/json' -X POST "${BASE}/api/acp/agents" -d "$PAYLOAD")
+            -b "$COOKIE_JAR" -H 'Content-Type: application/json' -X POST "${BASE}/api/acp/agents" -d "$PAYLOAD")
           echo "OMNI_ACP_POST_HTTP=$POST_CODE"
           jq -c '{error,added:(.added.id // null)}' /tmp/omni-post.json 2>/dev/null || head -c 500 /tmp/omni-post.json || true
           echo
