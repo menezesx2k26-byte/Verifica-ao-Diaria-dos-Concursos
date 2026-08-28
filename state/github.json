@@ -65,7 +65,6 @@
     "resolved_url": "https://www.saovicente.sp.gov.br/transparencia/bom?limite=30",
     "last_status": 200,
     "document_urls": [
-      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-652-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-653-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-654-suplementar-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-654-versaoimpressao.pdf/view",
@@ -84,6 +83,7 @@
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-668-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-669-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-670-versaoimpressao-1.pdf/view",
+      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-671-versaoimpressao-1.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom667/view"
     ],
     "document_count": 20,
@@ -110,19 +110,8 @@
     "failures": 0,
     "resolved_url": "https://plenussistemas.dioenet.com.br/list/praia-grande",
     "last_status": 200,
-    "document_urls": [
-      "https://plenussistemas.dioenet.com.br/uploads/view/37010?utm_edicao=443",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37019?utm_edicao=444_extra",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37033?utm_edicao=445",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37053?utm_edicao=446",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37060?utm_edicao=447_extra",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37075?utm_edicao=448",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37076?utm_edicao=449_extra",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37087?utm_edicao=450",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37104?utm_edicao=451",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37125?utm_edicao=452"
-    ],
-    "document_count": 10,
+    "document_urls": [],
+    "document_count": 0,
     "context_sigs": [],
     "context_count": 0,
     "parser_version": 4,
