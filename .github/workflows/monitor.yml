@@ -15,9 +15,19 @@ on:
       - "monitor_runner.py"
       - "smtp_alert.py"
       - "new_contests.py"
+      - "relevance_filter.py"
+      - "canonicalize_contests.py"
+      - "generic_health.py"
+      - "priority_scanner.py"
+      - "build_d1_snapshot.py"
+      - "ensure_d1_v4.py"
       - "tests/**"
       - "config/**"
       - "requirements.txt"
+      - "cloudflare/package.json"
+      - "cloudflare/package-lock.json"
+      - "cloudflare/schema.sql"
+      - "cloudflare/migrations/**"
       - ".github/workflows/monitor.yml"
   schedule:
     - cron: "7,22,37,52 * * * *"
@@ -33,7 +43,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,13 +56,13 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Testar parser, monitor e transportes
+      - name: Testar parsers, monitor e transportes
         run: |
           python monitor.py --self-test
-          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py
+          python -m py_compile monitor_runner.py smtp_alert.py new_contests.py relevance_filter.py canonicalize_contests.py generic_health.py priority_scanner.py build_d1_snapshot.py ensure_d1_v4.py
           python -m unittest discover -s tests -p "test_*.py" -v
 
-      - name: Verificar acompanhamentos prioritários
+      - name: Verificar acompanhamentos prioritários existentes
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -74,12 +84,64 @@ jobs:
           ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
         run: python monitor_runner.py
 
+      - name: Auditoria documental dos três acompanhamentos prioritários
+        run: python priority_scanner.py
+
       - name: Descobrir concursos e processos seletivos novos
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           ALERT_GITHUB_ASSIGNEE: menezesx2k26-byte
         run: python new_contests.py
+
+      - name: Estabilizar identidade dos concursos
+        run: python canonicalize_contests.py
+
+      - name: Validar saúde semântica das fontes amplas
+        run: python generic_health.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar Wrangler
+        working-directory: cloudflare
+        run: npm install --no-audit --no-fund
+
+      - name: Garantir schema D1 v4 antes de escrever
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_D1_DATABASE_NAME: concursos-watch
+        run: python ensure_d1_v4.py
+
+      - name: Gerar snapshot D1 validado
+        run: python build_d1_snapshot.py
+
+      - name: Aplicar snapshot D1 diretamente
+        working-directory: cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 execute concursos-watch --remote --file=../state/d1_snapshot.sql
+
+      - name: Smoke read-only da API pública
+        env:
+          CONCURSOS_API_URL: ${{ vars.CONCURSOS_API_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$CONCURSOS_API_URL"
+          curl -fsS "$CONCURSOS_API_URL/api/v1/contests?limit=5" > /tmp/contests.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/contests.json', encoding='utf-8'))
+          rows = data.get('items', data if isinstance(data, list) else [])
+          for row in rows:
+              status = str(row.get('relevance_status', 'ACCEPTED'))
+              assert not status.startswith('REJECTED_')
+              assert not status.startswith('QUARANTINED_')
+          print('API read-only smoke OK')
+          PY
 
       - name: Persistir estados apenas quando mudaram
         shell: bash
@@ -88,15 +150,13 @@ jobs:
           git config user.name "concursos-watch[bot]"
           git config user.email "concursos-watch[bot]@users.noreply.github.com"
           changed=0
-          for file in state/github.json state/new_contests.json; do
+          for file in state/github.json state/new_contests.json state/relevance_diagnostics.json state/priority_events.json state/source_health_history.json state/contest_identity_history.json; do
             if [[ -f "$file" ]] && [[ -n "$(git status --porcelain -- "$file")" ]]; then
               git add "$file"
               changed=1
             fi
           done
-          if [[ "$changed" == "0" ]]; then
-            exit 0
-          fi
+          if [[ "$changed" == "0" ]]; then exit 0; fi
           git commit -m "chore(watch): update monitor state"
           git pull --rebase origin main
           git push origin HEAD:main
@@ -106,9 +166,7 @@ jobs:
         run: |
           set -euo pipefail
           DAY="$(date -u +%d)"
-          if [[ "$DAY" != "01" && "$DAY" != "15" ]]; then
-            exit 0
-          fi
+          if [[ "$DAY" != "01" && "$DAY" != "15" ]]; then exit 0; fi
           date -u +%FT%TZ > .watch-keepalive
           git config user.name "concursos-watch[bot]"
           git config user.email "concursos-watch[bot]@users.noreply.github.com"

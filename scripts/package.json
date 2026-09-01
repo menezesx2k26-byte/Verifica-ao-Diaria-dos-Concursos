@@ -1,0 +1,8 @@
+{
+  "name": "concursos-watch-ci-tools",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "playwright": "1.55.0"
+  }
+}

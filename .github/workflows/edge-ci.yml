@@ -1,0 +1,114 @@
+name: Rust Edge CI
+
+on:
+  pull_request:
+    paths:
+      - "edge/**"
+      - "cloudflare/schema.sql"
+      - "cloudflare/package.json"
+      - "cloudflare/package-lock.json"
+      - ".github/workflows/edge-ci.yml"
+  push:
+    branches: [feat/concursos-watch-v3-hardening]
+    paths:
+      - "edge/**"
+      - "cloudflare/schema.sql"
+      - "cloudflare/package.json"
+      - "cloudflare/package-lock.json"
+      - ".github/workflows/edge-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Workers WASM target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Rust format, clippy and tests
+        run: |
+          cargo fmt --manifest-path edge/Cargo.toml --check
+          cargo clippy --manifest-path edge/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path edge/Cargo.toml
+
+      - name: Compile Cloudflare Worker for WASM
+        run: cargo check --manifest-path edge/Cargo.toml --target wasm32-unknown-unknown
+
+      - name: Guard dashboard assets against remote execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          css = Path('edge/assets/dashboard.css').read_text(encoding='utf-8').lower()
+          forbidden = ('@import', 'url(http://', 'url(https://', 'url(//', 'javascript:')
+          for token in forbidden:
+              assert token not in css, f'forbidden dashboard CSS token: {token}'
+
+          source = Path('edge/src/dashboard.rs').read_text(encoding='utf-8')
+          production_renderer = source.split('#[cfg(test)]', 1)[0].lower()
+          assert '<script' not in production_renderer, 'production renderer must not emit script tags'
+          print('dashboard static security guard OK')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Wrangler and worker-build
+        run: |
+          npm --prefix cloudflare install --no-audit --no-fund
+          cargo install worker-build --locked
+
+      - name: Initialize local D1 with production schema
+        working-directory: cloudflare
+        run: |
+          npx wrangler d1 execute concursos-watch \
+            --local \
+            --file=./schema.sql \
+            --config ../edge/wrangler.toml
+
+      - name: Runtime smoke Worker + local D1
+        working-directory: cloudflare
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev --local --config ../edge/wrangler.toml --port 8787 >/tmp/cw-wrangler-local.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; cat /tmp/cw-wrangler-local.log || true' EXIT
+
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 3 http://127.0.0.1:8787/health >/tmp/cw-health.json; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" = "1"
+
+          curl -fsS http://127.0.0.1:8787/api/v1/contests?limit=3 >/tmp/cw-contests.json
+          curl -fsS http://127.0.0.1:8787/api/v1/sources >/tmp/cw-sources.json
+          curl -fsS http://127.0.0.1:8787/api/v1/dashboard-manifest >/tmp/cw-manifest.json
+          curl -fsS http://127.0.0.1:8787/dashboard >/tmp/cw-dashboard.html
+          curl -fsS http://127.0.0.1:8787/assets/dashboard.css >/tmp/cw-dashboard.css
+
+          python - <<'PY'
+          import hashlib, json
+          contests = json.load(open('/tmp/cw-contests.json', encoding='utf-8'))
+          manifest = json.load(open('/tmp/cw-manifest.json', encoding='utf-8'))
+          html = open('/tmp/cw-dashboard.html', 'rb').read()
+          css = open('/tmp/cw-dashboard.css', 'rb').read()
+          assert contests.get('items') == [], contests
+          assert int(manifest['schema_version']) == 1
+          assert hashlib.sha256(html).hexdigest() == manifest['html_sha256']
+          assert hashlib.sha256(css).hexdigest() == manifest['css_sha256']
+          assert b'<script' not in html.lower()
+          print('local Worker/D1 runtime smoke OK')
+          PY
+
+          code="$(curl -sS -o /tmp/cw-ingest -w '%{http_code}' -X POST http://127.0.0.1:8787/api/v1/ingest)"
+          test "$code" = "404"

@@ -1,12 +1,20 @@
-# Setup operacional
+# Setup operacional — Concursos Watch v4
 
-Este repositório usa dois executores externos independentes (GitHub Actions e Cloudflare Worker) e pode manter o ChatGPT Watch como uma terceira camada de pesquisa. O código público não deve conter nome completo, número de inscrição, tokens ou endereços privados; esses dados entram por Secrets.
+A v4 separa claramente coleta, publicação, leitura pública e aplicativo:
 
-## 1. GitHub Actions — monitor principal
+```text
+Python -> snapshot SQL validado -> GitHub Actions -> D1
+Rust/WASM -> API pública somente leitura + dashboard
+Android -> API nativa + Home HTML/CSS validada localmente
+```
 
-O workflow `Concursos Watch — GitHub` roda nos minutos **07, 22, 37 e 52** de cada hora e também pode ser executado manualmente.
+Não existe endpoint público de ingestão no estado final. `WATCHDOG_TOKEN`, `/run`, `/test-alert` e o Worker JS antigo pertencem ao legado v3 e não devem ser usados como caminho de publicação da v4.
 
-Em **Settings → Secrets and variables → Actions**, configure os canais que quiser usar.
+## 1. GitHub Actions — monitor Python
+
+O workflow `Concursos Watch — GitHub` coleta fontes, lê PDFs, normaliza, classifica relevância, deduplica, detecta eventos e gera estado canônico.
+
+Canais de alerta continuam opcionais e independentes:
 
 ### Telegram
 - `TELEGRAM_BOT_TOKEN`
@@ -14,160 +22,181 @@ Em **Settings → Secrets and variables → Actions**, configure os canais que q
 
 ### ntfy
 - `NTFY_TOPIC`
-- `NTFY_SERVER` (opcional; padrão `https://ntfy.sh`)
+- `NTFY_SERVER` (opcional)
 - `NTFY_TOKEN` (opcional)
 
-### E-mail independente pelo GitHub/Resend
+### E-mail
 - `RESEND_API_KEY`
-- `ALERT_EMAIL_FROM` — remetente validado no Resend
-- `ALERT_EMAIL_TO` — um ou mais destinatários separados por vírgula
+- `ALERT_EMAIL_FROM`
+- `ALERT_EMAIL_TO`
+- ou os secrets SMTP já suportados pelo monitor GitHub.
 
-### Termos pessoais de prioridade
-- `WATCH_PRIORITY_TERMS` — opcional; termos separados por vírgula, ponto e vírgula ou quebra de linha.
+### Termos privados de prioridade
+- `WATCH_PRIORITY_TERMS`
 
-Use este secret para nome completo, número de inscrição ou outro identificador que você não queira publicar no repositório. Se qualquer termo aparecer numa página/PDF monitorado, o evento é elevado para **PRIORIDADE**.
+Identificadores pessoais nunca devem ser commitados em arquivo público. Mantenha-os somente em GitHub Secrets.
 
-### Watchdog GitHub ↔ Cloudflare
-- `WATCHDOG_TOKEN` — segredo aleatório compartilhado pelos dois sistemas.
+## 2. Filtragem antes do D1
 
-Os secrets `CLOUDFLARE_HEARTBEAT_URL` e `CLOUDFLARE_HEALTH_URL` continuam aceitos como override, mas normalmente **não são necessários**: depois do primeiro deploy o workflow da Cloudflare descobre a URL do Worker e grava automaticamente `config/runtime.json`.
+A publicação é fail-closed:
 
-O `GITHUB_TOKEN` nativo cria uma Issue em eventos reais detectados pelo monitor GitHub. O heartbeat diário não abre Issue para não poluir o repositório.
+1. rejeitar licitação/pregão/compras e navegação institucional;
+2. exigir sinal positivo de recrutamento de pessoas;
+3. classificar confiança;
+4. mandar ambíguos para quarentena;
+5. aplicar perfil de interesse;
+6. publicar somente `relevance_status = ACCEPTED`.
 
-## 2. Cloudflare — deploy automático pelo GitHub
+`state/relevance_diagnostics.json` é diagnóstico interno do pipeline e não é feed público.
 
-Não é mais necessário criar KV manualmente nem editar ID no `wrangler.jsonc`.
+## 3. Credenciais Cloudflare
 
-Crie estes GitHub Secrets:
+Em **Settings -> Secrets and variables -> Actions** deste repositório, configure:
 
-- `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
-- `WATCHDOG_TOKEN` — exatamente o mesmo valor usado pelo monitor GitHub
+- `CLOUDFLARE_ACCOUNT_ID`
 
-O token da Cloudflare precisa conseguir implantar Workers e ler/criar Workers KV. Restrinja o token somente à sua conta e ao mínimo de permissões necessário.
+O token deve ser restrito à conta correta e às permissões mínimas necessárias para Workers Scripts e D1. Não use token global e não copie credenciais para o APK.
 
-Depois execute **Actions → Deploy Cloudflare Watch → Run workflow**.
+Esses secrets são necessários para:
 
-O workflow fará automaticamente:
+- reconciliar schema/migrations do D1 remoto;
+- aplicar `state/d1_snapshot.sql`;
+- criar/atualizar draft e promoção do dashboard;
+- implantar o Worker Rust staging/produção;
+- executar smoke remoto.
 
-1. validar as credenciais;
-2. criar ou reutilizar o namespace KV `concursos-watch-state`;
-3. gerar `wrangler.generated.jsonc` com o binding `WATCH_STATE`;
-4. enviar os runtime secrets sem imprimi-los no log;
-5. executar `wrangler deploy --dry-run`;
-6. implantar o Worker e seus Cron Triggers;
-7. descobrir a URL `workers.dev` pela API da Cloudflare;
-8. testar `/health`;
-9. gravar a URL em `config/runtime.json` no repositório;
-10. apagar os arquivos temporários contendo configuração/secrets.
+Sem esses secrets, os gates locais continuam testáveis, mas o staging remoto e o merge de produção permanecem bloqueados.
 
-O Worker roda nos minutos **02, 17, 32 e 47** de cada hora, intercalado com o GitHub.
+## 4. D1
 
-## 3. E-mail independente pela Cloudflare
+O schema para instalação nova é `cloudflare/schema.sql`.
 
-O e-mail do Worker é propositalmente separado do Resend usado pelo GitHub.
+Banco existente deve usar as migrations versionadas, incluindo `cloudflare/migrations/0002_v4.sql`. O helper `ensure_d1_v4.py` reconcilia banco novo, legado e já-v4 sem repetir `ALTER TABLE ... ADD COLUMN` de forma destrutiva.
 
-Primeiro habilite/onboarde seu domínio no **Cloudflare Email Service → Email Sending**. Depois crie:
-
-### Repository variable
-- `CF_EMAIL_ENABLED` = `true`
-
-### GitHub Secrets
-- `CF_EMAIL_FROM` — remetente pertencente ao domínio habilitado
-- `CF_EMAIL_TO` — destinatários separados por vírgula
-
-No próximo deploy, o bootstrap adiciona automaticamente o binding `EMAIL` e restringe remetentes/destinatários à allowlist informada.
-
-Se `CF_EMAIL_ENABLED` não estiver ativo, o Worker continua funcionando normalmente sem o canal de e-mail Cloudflare.
-
-## 4. Primeira execução e baseline
-
-A primeira execução de cada detector cria sua própria linha de base e **não deve alertar por tudo que já existia**. A partir da segunda execução, novos contextos/documentos relevantes geram eventos.
-
-O parser GitHub usa três níveis de proteção:
-
-- contexto de página com grupos obrigatórios;
-- leitura de PDFs/documentos novos quando possível;
-- alerta de `PDF NÃO EXTRAÍVEL`/`CANDIDATO NÃO LIDO` quando um documento parece fortemente relacionado, mas não pôde ser interpretado.
-
-## 5. Testes operacionais
-
-### GitHub
-
-Em **Actions → Concursos Watch — GitHub → Run workflow**, marque `send_test_alert = true`.
-
-O teste passa pelos canais configurados: Telegram, ntfy, Resend/e-mail e GitHub Issue.
-
-### Cloudflare
-
-Depois do deploy:
-
-```bash
-curl -X POST "https://SEU-WORKER/test-alert" \
-  -H "Authorization: Bearer SEU_WATCHDOG_TOKEN"
-```
-
-Para executar uma verificação completa manualmente:
-
-```bash
-curl -X POST "https://SEU-WORKER/run" \
-  -H "Authorization: Bearer SEU_WATCHDOG_TOKEN"
-```
-
-O endpoint público de saúde é:
+O monitor gera:
 
 ```text
-https://SEU-WORKER/health
+state/d1_snapshot.sql
 ```
 
-Ele não expõe tokens; mostra apenas timestamps/estado do watchdog.
+A transação grava pais de concurso antes de documentos/eventos, preserva FKs e usa upsert/idempotência. Concursos ausentes do snapshot aceito são arquivados (`active = 0`) dentro da mesma transação.
 
-## 6. Watchdog cruzado
+## 5. Worker Rust/WASM
 
-Depois que `config/runtime.json` existir:
+A superfície pública prevista é somente leitura:
 
-- GitHub envia heartbeat autenticado ao Worker em cada execução;
-- GitHub lê `/health` e alerta se a Cloudflare ficar desatualizada;
-- Cloudflare guarda o heartbeat do GitHub no KV e alerta se ele ficar antigo;
-- se o GitHub nunca tiver enviado heartbeat, a Cloudflare concede uma janela inicial de 90 minutos e depois acusa a ausência;
-- quando um monitor volta, é enviado evento de recuperação.
+```text
+GET /health
+GET /api/v1/contests
+GET /api/v1/contests/:id
+GET /api/v1/alerts
+GET /api/v1/sources
+GET /api/v1/dashboard-manifest
+GET /dashboard
+GET /assets/dashboard.css
+```
 
-Assim, `nenhuma novidade` e `o monitor morreu` deixam de ser situações indistinguíveis.
+Qualquer `POST /api/v1/ingest` deve responder 404. Métodos mutáveis em rotas conhecidas não são uma interface de escrita pública.
 
-## 7. Heartbeat diário
+O CI valida Rust com:
 
-Depois das 09:00 no fuso `America/Sao_Paulo`, cada infraestrutura tenta enviar **uma confirmação de saúde por dia** pelos canais externos configurados.
+```bash
+cargo fmt --manifest-path edge/Cargo.toml --check
+cargo clippy --manifest-path edge/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path edge/Cargo.toml
+cargo check --manifest-path edge/Cargo.toml --target wasm32-unknown-unknown
+```
 
-O GitHub resume o estado de todas as fontes e a presença da Cloudflare. O Worker resume quantas fontes responderam e mantém o watchdog do GitHub em paralelo.
+Além disso, `Rust Edge CI` sobe o Worker com Wrangler e D1 local e faz smoke HTTP real, sem depender de credenciais Cloudflare.
 
-O heartbeat só é marcado como entregue quando pelo menos um canal externo realmente aceitou a notificação.
+## 6. Staging e cutover
 
-## 8. Redundância efetiva
+O workflow `Deploy Cloudflare Rust Edge` usa a branch para staging e `main` para produção.
 
-1. GitHub Actions — parser profundo e leitura de documentos/PDFs.
-2. Cloudflare Worker — segundo scheduler, segundo estado em KV e matching independente.
-3. ChatGPT Watch — terceira camada de pesquisa independente, quando mantido ativo.
-4. Telegram.
-5. ntfy.
-6. E-mail GitHub/Resend.
-7. E-mail Cloudflare Email Service.
-8. GitHub Issues como trilha permanente para eventos do detector GitHub.
-9. GitHub e Cloudflare vigiam o heartbeat um do outro.
-10. Heartbeat diário confirma que silêncio significa `sem novidade`, não `sistema morto`.
+Antes do cutover devem passar:
 
-## 9. Keepalive do GitHub
+1. CI Python/anti-ruído;
+2. Rust/WASM e runtime local D1;
+3. Build Android;
+4. Android Visual QA;
+5. Dashboard Visual QA;
+6. staging Rust remoto com D1 real;
+7. smoke de `/health`, concursos, manifest, HTML/CSS;
+8. confirmação de `POST /api/v1/ingest -> 404`.
 
-Repositórios públicos podem ter workflows agendados desativados após longos períodos sem atividade. O workflow grava `.watch-keepalive` nos dias 1 e 15, mantendo atividade periódica no repositório.
+Somente depois disso o Worker JS/publisher legado pode ser removido e a produção promovida.
 
-## 10. CI
+## 7. Dashboard declarativo
 
-O workflow `Concursos Watch — CI` roda em PRs e mudanças no `main` e valida:
+A fonte versionada é `config/dashboard.json`. Ela não aceita HTML arbitrário.
 
-- sintaxe do Python;
-- autotestes de normalização/matching;
-- JSON das fontes;
-- sintaxe do Worker;
-- geração offline do KV binding;
-- `wrangler deploy --dry-run` com secret de teste.
+Fluxo:
 
-Isso impede que uma alteração de código quebre silenciosamente os dois monitores ao mesmo tempo.
+```text
+config -> validate_dashboard_config.py -> draft SQL
+       -> renderer Rust determinístico
+       -> validate_dashboard_bundle.py
+       -> Dashboard Visual QA
+       -> promoção SQL atômica
+```
+
+A promoção preserva a versão anterior como rollback (`superseded`).
+
+HTML não pode conter conteúdo ativo e CSS não pode carregar recursos remotos. O dashboard servido pelo Rust inclui hashes e headers de segurança.
+
+## 8. Android v4
+
+O APK usa HTTP nativo para buscar o dashboard. Antes de armazenar ele valida:
+
+- schema suportado;
+- `min_app_version`;
+- HTTPS e host oficial;
+- MIME;
+- limite de tamanho;
+- SHA-256 de HTML/CSS;
+- estrutura HTML/CSS segura.
+
+Depois da validação o bundle é promovido atomicamente para `last_known_good`.
+
+A WebView:
+
+```text
+JavaScript OFF
+DOM storage OFF
+file access OFF
+content access OFF
+mixed content BLOCK
+network loads BLOCK
+JS bridge NONE
+```
+
+Sem cache válido, a Home cai para Compose nativo. Alertas, Concursos, Salvos, Detalhes e Ajustes continuam nativos.
+
+## 9. QA obrigatório
+
+`Android Visual QA` captura:
+
+- Home dinâmica;
+- Home offline/fallback;
+- Alertas;
+- Concursos;
+- Salvos;
+- Ajustes.
+
+`Dashboard Visual QA` captura o painel em viewport de telefone e viewport ampla com JavaScript desativado.
+
+Não promova dashboard nem mergeie a v4 se algum desses gates estiver vermelho.
+
+## 10. Release
+
+O aplicativo v4 usa versionamento nativo `4.x.y` e `versionCode` crescente. Dashboard tem versionamento independente (`dashboard_version` e `style_version`).
+
+Depois de merge em `main`:
+
+1. validar deploy Rust de produção;
+2. validar leitura do D1 remoto;
+3. validar manifest/hash/HTML/CSS;
+4. validar ausência de ingest público;
+5. obter o APK produzido pelo workflow de release/build;
+6. manter a versão anterior do Worker/dashboard disponível para rollback operacional.

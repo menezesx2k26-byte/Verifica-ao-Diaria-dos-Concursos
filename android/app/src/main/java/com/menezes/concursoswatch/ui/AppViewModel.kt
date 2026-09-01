@@ -6,7 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.menezes.concursoswatch.BuildConfig
 import com.menezes.concursoswatch.data.ContestRepository
+import com.menezes.concursoswatch.data.DashboardRemoteDataSource
+import com.menezes.concursoswatch.data.DashboardRepository
+import com.menezes.concursoswatch.data.DashboardStore
+import com.menezes.concursoswatch.data.DashboardUiState
+import com.menezes.concursoswatch.data.DashboardValidator
 import com.menezes.concursoswatch.data.SettingsStore
 import com.menezes.concursoswatch.model.AlertItem
 import com.menezes.concursoswatch.model.Contest
@@ -18,82 +24,149 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.net.URI
 import java.time.Instant
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
-
 data class AppUiState(
-    val contests: List<Contest> = emptyList(),
-    val alerts: List<AlertItem> = emptyList(),
-    val sourceHealth: List<SourceHealth> = emptyList(),
-    val regionFilter: RegionFilter = RegionFilter.ALL,
-    val statusFilter: StatusFilter = StatusFilter.ALL,
-    val search: String = "",
-    val syncing: Boolean = false,
-    val lastSync: Long = 0L,
-    val contestError: String? = null,
-    val alertError: String? = null,
-    val sourceCount: Int = 0,
-    val healthySources: Int = 0,
-    val settings: UserSettings = UserSettings(),
-    val latestRelease: String? = null,
-    val selectedContest: Contest? = null,
+    val contests: List<Contest> = emptyList(), val alerts: List<AlertItem> = emptyList(),
+    val sourceHealth: List<SourceHealth> = emptyList(), val regionFilter: RegionFilter = RegionFilter.ALL,
+    val statusFilter: StatusFilter = StatusFilter.ALL, val search: String = "", val syncing: Boolean = false,
+    val lastSync: Long = 0L, val contestError: String? = null, val alertError: String? = null,
+    val sourceCount: Int = 0, val healthySources: Int = 0, val settings: UserSettings = UserSettings(),
+    val latestRelease: String? = null, val selectedContest: Contest? = null,
+    val dashboard: DashboardUiState = DashboardUiState.Loading,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ContestRepository(app)
     private val settingsStore = SettingsStore(app)
+    private val dashboardRemote = DashboardRemoteDataSource()
+    private val dashboardRoot = File(app.filesDir, "dashboard")
+
     var state by mutableStateOf(AppUiState())
         private set
 
     init {
         reload()
-        viewModelScope.launch {
-            settingsStore.flow.collectLatest { state = state.copy(settings = it) }
-        }
+        viewModelScope.launch { settingsStore.flow.collectLatest { state = state.copy(settings = it) } }
+        refreshDashboard()
+        // A first launch must never sit on an empty "waiting for the 15-minute worker" state.
+        // Refresh immediately; WorkManager remains the background safety net afterwards.
+        syncNow()
     }
 
     fun reload() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val health = parseHealth(repo.sourceHealthJson())
-            val loaded = AppUiState(
-                contests = repo.contests(), alerts = repo.alerts(), sourceHealth = health,
-                regionFilter = state.regionFilter, statusFilter = state.statusFilter, search = state.search,
-                syncing = state.syncing, lastSync = repo.lastSync(), contestError = repo.lastContestError(),
-                alertError = repo.lastAlertError(), sourceCount = repo.sourceCount(), healthySources = health.count { it.ok },
-                settings = state.settings, latestRelease = repo.latestKnownRelease(), selectedContest = state.selectedContest
+        viewModelScope.launch {
+            val snapshot = state
+            val loaded = withContext(Dispatchers.IO) {
+                val health = repo.sourceHealth()
+                snapshot.copy(
+                    contests = repo.contests(), alerts = repo.alerts(), sourceHealth = health,
+                    lastSync = repo.lastSync(), contestError = repo.lastContestError(), alertError = repo.lastAlertError(),
+                    sourceCount = repo.sourceCount(), healthySources = health.count { it.ok }, latestRelease = repo.latestKnownRelease(),
+                )
+            }
+            state = loaded.copy(
+                settings = state.settings,
+                syncing = state.syncing,
+                selectedContest = state.selectedContest,
+                dashboard = state.dashboard,
             )
-            withContext(Dispatchers.Main) { state = loaded }
         }
     }
 
     fun syncNow() {
         if (state.syncing) return
         state = state.copy(syncing = true)
-        viewModelScope.launch(Dispatchers.IO) {
-            repo.syncAll()
-            withContext(Dispatchers.Main) { state = state.copy(syncing = false) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { repo.syncAll() }
+            state = state.copy(syncing = false)
             reload()
+            refreshDashboard()
         }
     }
+
+    fun refreshDashboard() {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    dashboardRepository().let { dashboardRepository ->
+                        val cached = dashboardRepository.cachedState()
+                        if (cached is DashboardUiState.Ready) {
+                            withContext(Dispatchers.Main) {
+                                state = state.copy(dashboard = cached)
+                            }
+                        }
+                        dashboardRepository.refresh()
+                    }
+                }.getOrElse { error ->
+                    state.dashboard.takeIf { it is DashboardUiState.Ready }
+                        ?: DashboardUiState.Unavailable(error.message ?: "dashboard_unavailable")
+                }
+            }
+            state = state.copy(dashboard = result)
+        }
+    }
+
+    private fun dashboardRepository(): DashboardRepository {
+        val host = trustedDashboardHost()
+        val validator = DashboardValidator(
+            officialHost = host,
+            currentAppVersion = BuildConfig.VERSION_NAME,
+        )
+        return DashboardRepository(
+            remote = dashboardRemote,
+            store = DashboardStore(dashboardRoot, validator),
+        )
+    }
+
+    private fun trustedDashboardHost(): String {
+        BuildConfig.API_BASE_URL.trim().takeIf { it.isNotEmpty() }?.let { configured ->
+            return requireNotNull(URI(configured).host) { "dashboard configured host ausente" }
+        }
+
+        cachedDashboardHost()?.let { return it }
+        return dashboardRemote.officialHost()
+    }
+
+    private fun cachedDashboardHost(): String? = runCatching {
+        val manifestFile = File(File(dashboardRoot, "current"), DashboardStore.MANIFEST_FILE)
+        if (!manifestFile.exists()) return@runCatching null
+        val htmlUrl = JSONObject(manifestFile.readText()).getString("html_url")
+        URI(htmlUrl).host?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     fun setSearch(value: String) { state = state.copy(search = value) }
     fun setRegion(value: RegionFilter) { state = state.copy(regionFilter = value) }
     fun setStatus(value: StatusFilter) { state = state.copy(statusFilter = value) }
-    fun selectContest(c: Contest) { repo.markContestRead(c.id); state = state.copy(selectedContest = c.copy(unread = false)); reload() }
-    fun markAlertRead(a: AlertItem) { repo.markAlertRead(a.id); reload() }
-    fun toggleFavorite(c: Contest) { repo.setFavorite(c.id, !c.favorite); reload() }
-    fun markAllContestsRead() { repo.markAllContestsRead(); reload() }
-    fun markAllAlertsRead() { repo.markAllAlertsRead(); reload() }
+
+    fun loadContest(id: String) {
+        viewModelScope.launch {
+            val selected = withContext(Dispatchers.IO) { repo.markContestRead(id); repo.contest(id)?.copy(unread = false) }
+            state = state.copy(selectedContest = selected)
+            reload()
+        }
+    }
+
+    fun markAlertRead(a: AlertItem) = viewModelScope.launch { withContext(Dispatchers.IO) { repo.markAlertRead(a.id) }; reload() }
+    fun toggleFavorite(c: Contest) = viewModelScope.launch {
+        withContext(Dispatchers.IO) { repo.setFavorite(c.id, !c.favorite) }
+        state = state.copy(selectedContest = state.selectedContest?.takeIf { it.id == c.id }?.copy(favorite = !c.favorite) ?: state.selectedContest)
+        reload()
+    }
+    fun markAllContestsRead() = viewModelScope.launch { withContext(Dispatchers.IO) { repo.markAllContestsRead() }; reload() }
+    fun markAllAlertsRead() = viewModelScope.launch { withContext(Dispatchers.IO) { repo.markAllAlertsRead() }; reload() }
     fun saveSettings(s: UserSettings) { viewModelScope.launch { settingsStore.save(s) } }
 
     fun filteredContests(favoritesOnly: Boolean = false): List<Contest> {
-        val q = state.search.trim().lowercase()
-        val today = LocalDate.now()
+        val q = state.search.trim().lowercase(); val today = LocalDate.now()
         return state.contests.filter { c ->
             if (favoritesOnly && !c.favorite) return@filter false
+            if (!favoritesOnly && !c.active) return@filter false
             val regionOk = when (state.regionFilter) {
                 RegionFilter.ALL -> true
                 RegionFilter.FEDERAL -> c.scope.equals("federal", true)
@@ -107,41 +180,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 StatusFilter.NEW -> c.unread
                 StatusFilter.CLOSING_SOON -> parseDate(c.endDate)?.let { ChronoUnit.DAYS.between(today, it) in 0..7 } ?: false
             }
-            val searchOk = q.isBlank() || listOf(c.title, c.organization, c.city, c.area, c.education, c.type, c.source).any { it.lowercase().contains(q) }
+            val searchOk = q.isBlank() || listOf(c.title,c.organization,c.city,c.area,c.education,c.type,c.source).any { it.lowercase().contains(q) }
             regionOk && statusOk && searchOk
         }
     }
 
-    private fun parseHealth(raw: String): List<SourceHealth> = runCatching {
-        val array = JSONArray(raw)
-        buildList {
-            for (i in 0 until array.length()) {
-                val o = array.getJSONObject(i)
-                add(SourceHealth(
-                    id = o.optString("id"), label = o.optString("label"), ok = o.optBoolean("ok"),
-                    itemCount = o.optInt("item_count"), checkedAt = o.optString("checked_at"), error = o.optString("error")
-                ))
-            }
-        }
-    }.getOrDefault(emptyList())
-
     private fun parseDate(value: String): LocalDate? = runCatching {
         when {
             value.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) -> LocalDate.parse(value)
-            value.matches(Regex("\\d{2}/\\d{2}/\\d{4}")) -> {
-                val p = value.split('/'); LocalDate.of(p[2].toInt(), p[1].toInt(), p[0].toInt())
-            }
+            value.matches(Regex("\\d{2}/\\d{2}/\\d{4}")) -> value.split('/').let { LocalDate.of(it[2].toInt(), it[1].toInt(), it[0].toInt()) }
             else -> null
         }
     }.getOrNull()
 
     fun relativeSync(): String {
-        if (state.lastSync == 0L) return "Nunca sincronizado"
+        if (state.lastSync == 0L) return if (state.syncing) "em andamento" else "ainda não realizada"
         val minutes = ChronoUnit.MINUTES.between(Instant.ofEpochMilli(state.lastSync), Instant.now())
-        return when {
-            minutes < 1 -> "agora"
-            minutes < 60 -> "há ${minutes} min"
-            else -> "há ${minutes / 60} h"
-        }
+        return when { minutes < 1 -> "agora"; minutes < 60 -> "há ${minutes} min"; else -> "há ${minutes / 60} h" }
     }
 }

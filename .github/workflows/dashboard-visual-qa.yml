@@ -1,0 +1,182 @@
+name: Dashboard Visual QA
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "edge/**"
+      - "config/dashboard.json"
+      - "validate_dashboard_config.py"
+      - "validate_dashboard_bundle.py"
+      - "build_dashboard_sql.py"
+      - "ensure_d1_v4.py"
+      - "scripts/capture-dashboard.mjs"
+      - "scripts/package.json"
+      - "tests/test_dashboard_*.py"
+      - ".github/workflows/dashboard-visual-qa.yml"
+  push:
+    branches: [main, feat/concursos-watch-v3-hardening]
+    paths:
+      - "edge/**"
+      - "config/dashboard.json"
+      - "validate_dashboard_config.py"
+      - "validate_dashboard_bundle.py"
+      - "build_dashboard_sql.py"
+      - "ensure_d1_v4.py"
+      - "scripts/capture-dashboard.mjs"
+      - "scripts/package.json"
+      - "tests/test_dashboard_*.py"
+      - ".github/workflows/dashboard-visual-qa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: concursos-watch-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual_qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate dashboard config tests
+        run: |
+          python -m unittest tests.test_dashboard_config tests.test_dashboard_bundle -v
+          python validate_dashboard_config.py config/dashboard.json
+
+      - name: Render deterministic Rust dashboard
+        run: cargo run --quiet --manifest-path edge/Cargo.toml --bin render-dashboard-preview
+
+      - name: Validate rendered HTML and CSS
+        run: python validate_dashboard_bundle.py edge/test-output/dashboard.html edge/test-output/dashboard.css
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install visual QA browser
+        working-directory: scripts
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Capture phone and wide screenshots with JavaScript disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p visual-qa
+          python -m http.server 4173 --directory edge/test-output >/tmp/dashboard-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS http://127.0.0.1:4173/dashboard.html >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4173/dashboard.html >/dev/null
+          node scripts/capture-dashboard.mjs
+          test -s visual-qa/dashboard-phone.png
+          test -s visual-qa/dashboard-wide.png
+
+      - name: Upload dashboard visual QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ConcursosWatch-v4-dashboard-visual-qa
+          path: visual-qa/
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish:
+    needs: visual_qa
+    if: github.ref == 'refs/heads/main' && needs.visual_qa.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CONCURSOS_API_URL: ${{ vars.CONCURSOS_API_URL }}
+      CF_D1_DATABASE_NAME: concursos-watch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Wrangler
+        working-directory: cloudflare
+        run: npm install --no-audit --no-fund
+
+      - name: Ensure D1 v4 schema
+        run: python ensure_d1_v4.py
+
+      - name: Build draft and promotion SQL
+        run: python build_dashboard_sql.py config/dashboard.json state/dashboard_publish.sql state/dashboard_promote.sql
+
+      - name: Record rollback version
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd cloudflare && npx wrangler d1 execute concursos-watch --remote \
+            --command "SELECT version FROM dashboard_configs WHERE status='published' ORDER BY version DESC LIMIT 1" \
+            --json) > /tmp/previous-dashboard.json
+          echo '### Dashboard rollback point' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/previous-dashboard.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish dashboard atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd cloudflare && npx wrangler d1 execute concursos-watch --remote --file=../state/dashboard_publish.sql)
+          (cd cloudflare && npx wrangler d1 execute concursos-watch --remote --file=../state/dashboard_promote.sql)
+
+      - name: Verify exactly one published dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd cloudflare && npx wrangler d1 execute concursos-watch --remote \
+            --command "SELECT version FROM dashboard_configs WHERE status='published' ORDER BY version DESC" \
+            --json) > /tmp/published-dashboard.json
+          python - <<'PY'
+          import json
+          expected = json.load(open('config/dashboard.json', encoding='utf-8'))['dashboard_version']
+          payload = json.load(open('/tmp/published-dashboard.json', encoding='utf-8'))
+          rows=[]
+          def walk(x):
+              if isinstance(x, dict):
+                  if isinstance(x.get('results'), list): rows.extend(x['results'])
+                  for v in x.values(): walk(v)
+              elif isinstance(x, list):
+                  for v in x: walk(v)
+          walk(payload)
+          versions=[int(r['version']) for r in rows if isinstance(r, dict) and 'version' in r]
+          assert versions == [int(expected)], (versions, expected)
+          print('dashboard D1 promotion OK', versions[0])
+          PY
+
+      - name: Verify public manifest reaches promoted version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CONCURSOS_API_URL"
+          expected="$(python -c 'import json; print(json.load(open("config/dashboard.json"))["dashboard_version"])')"
+          for attempt in $(seq 1 20); do
+            if curl -fsS "$CONCURSOS_API_URL/api/v1/dashboard-manifest" > /tmp/manifest.json 2>/dev/null && \
+               EXPECTED_VERSION="$expected" python - <<'PY'
+          import json, os
+          data=json.load(open('/tmp/manifest.json', encoding='utf-8'))
+          assert int(data['dashboard_version']) == int(os.environ['EXPECTED_VERSION'])
+          PY
+            then
+              echo "dashboard manifest v$expected published"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "dashboard manifest did not converge to v$expected" >&2
+          exit 1

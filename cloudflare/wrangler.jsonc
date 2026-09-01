@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "concursos-watch-redundante",
-  "main": "src/index.js",
+  "main": "src/app.js",
   "compatibility_date": "2026-08-19",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
@@ -11,8 +11,5 @@
   "triggers": {
     "crons": ["2,17,32,47 * * * *"]
   }
-  // O workflow cloudflare-deploy.yml cria e adiciona automaticamente
-  // o binding WATCH_STATE na primeira implantação.
-  // Depois de habilitar Cloudflare Email Service, acrescente:
-  // "send_email": [{ "name": "EMAIL" }]
+  // bootstrap.mjs injeta automaticamente WATCH_STATE (KV) e DB (D1).
 }

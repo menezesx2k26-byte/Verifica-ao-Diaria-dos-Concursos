@@ -1,0 +1,88 @@
+name: Android Visual QA
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "android/**"
+      - "scripts/android-visual-qa.sh"
+      - ".github/workflows/android-visual-qa.yml"
+  push:
+    branches: [feat/concursos-watch-v3-hardening]
+    paths:
+      - "android/**"
+      - "scripts/android-visual-qa.sh"
+      - ".github/workflows/android-visual-qa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: concursos-watch-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Build debug APK
+        run: gradle -p android :app:assembleDebug --stacktrace
+
+      - name: Guard against native JavaScript bridges
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R --line-number --fixed-string "addJavascriptInterface" android/app/src/main; then
+            echo "JavaScript bridge is forbidden in Concursos Watch dashboard WebView" >&2
+            exit 1
+          fi
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Security tests and six real app screens
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: bash scripts/android-visual-qa.sh
+
+      - name: Assert visual artifacts exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in \
+            01-home-dynamic.png \
+            02-home-offline-fallback.png \
+            03-alertas.png \
+            04-concursos.png \
+            05-salvos.png \
+            06-ajustes.png; do
+            test -s "visual-qa/$file"
+          done
+
+      - name: Upload visual QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ConcursosWatch-v4-visual-qa
+          path: visual-qa/
+          if-no-files-found: warn
+          retention-days: 14

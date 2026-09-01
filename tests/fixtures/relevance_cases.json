@@ -1,0 +1,51 @@
+{
+  "reject": [
+    {
+      "title": "AVISO DE LICITAÇÃO – PREGÃO ELETRÔNICO nº. 23/2025 – EDITAL nº. 23/2025R",
+      "context": "aquisição e fornecimento por pregão eletrônico",
+      "url": "https://www.saovicente.sp.gov.br/transparencia/licitacoes/pregao/pregao-eletronico-no-23-2025",
+      "status": "REJECTED_PROCUREMENT"
+    },
+    {
+      "title": "ERRATA DO EDITAL - PREGÃO ELETRÔNICO nº. 76/2025",
+      "context": "errata de licitação",
+      "url": "https://www.saovicente.sp.gov.br/transparencia/licitacoes/pregao/76-2025",
+      "status": "REJECTED_PROCUREMENT"
+    },
+    {
+      "title": "AVISO PUBLICAÇÃO DE EDITAL - PREGÃO ELETRÔNICO nº. 55/2026",
+      "context": "publicação de edital de compra pública",
+      "url": "https://www.saovicente.sp.gov.br/transparencia/licitacoes/pregao/pregao-eletronico-no-55-2026",
+      "status": "REJECTED_PROCUREMENT"
+    },
+    {
+      "title": "Presidência",
+      "context": "Institucional",
+      "url": "https://www.tjsp.jus.br/QuemSomos/Presidencia",
+      "status": "REJECTED_NAVIGATION"
+    },
+    {
+      "title": "Corregedoria-Geral da Justiça",
+      "context": "Institucional",
+      "url": "https://www.tjsp.jus.br/Corregedoria",
+      "status": "REJECTED_NAVIGATION"
+    }
+  ],
+  "accept": [
+    {
+      "title": "Processo Seletivo para Professor Visitante – Edital nº 150/2026/DDP",
+      "context": "processo seletivo para professor visitante; inscrições abertas",
+      "url": "https://concursos.ufsc.br/2026/06/26/processo-seletivo-para-professor-visitante-edital-no-1502026ddp"
+    },
+    {
+      "title": "Edital Técnico-Administrativo em Educação",
+      "context": "concurso público para técnico-administrativo em educação",
+      "url": "https://concursos.ufsc.br/editais-tecnico-administrativo-em-educacao"
+    },
+    {
+      "title": "Concurso público para Assistente Técnico Administrativo",
+      "context": "concurso público para provimento de cargo administrativo",
+      "url": "https://example.gov.br/concursos/assistente-tecnico"
+    }
+  ]
+}
