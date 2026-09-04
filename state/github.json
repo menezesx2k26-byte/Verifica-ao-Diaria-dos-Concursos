@@ -65,7 +65,6 @@
     "resolved_url": "https://www.saovicente.sp.gov.br/transparencia/bom?limite=30",
     "last_status": 200,
     "document_urls": [
-      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-655-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-656-14072026-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-657-16072026-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-658-extra-versaoimpressao.pdf/view",
@@ -84,6 +83,7 @@
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-672-extra-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-673-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-674-versaoimpressao.pdf/view",
+      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-675-extra-versaoimpressao.pdf/view",
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom667/view"
     ],
     "document_count": 20,
@@ -93,19 +93,18 @@
     "last_attempt_ok": true
   },
   "pg_concursos_004_2024": {
-    "failures": 1,
+    "failures": 0,
     "resolved_url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187",
-    "last_status": null,
+    "last_status": 200,
     "context_sigs": [],
     "context_count": 0,
     "document_urls": [],
     "document_count": 0,
     "parser_version": 4,
     "transport": "direct",
-    "last_ok": "2026-09-01T18:26:41+00:00",
-    "last_attempt_ok": false,
-    "last_error": "falha ao buscar https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187: HTTPSConnectionPool(host='www.praiagrande.sp.gov.br', port=443): Max retries exceeded with url: /administracao/concurso_publico.asp?cd_pagina=187 (Caused by ConnectTimeoutError(<HTTPSConnection(host='www.praiagrande.sp.gov.br', port=443) at 0x7f34306e9b50>, 'Connection to www.praiagrande.sp.gov.br timed out. (connect timeout=25)'))",
-    "last_failure": "2026-09-04T18:26:53+00:00"
+    "last_ok": "2026-09-04T20:55:09+00:00",
+    "last_attempt_ok": true,
+    "last_error": "falha ao buscar https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187: HTTPSConnectionPool(host='www.praiagrande.sp.gov.br', port=443): Max retries exceeded with url: /administracao/concurso_publico.asp?cd_pagina=187 (Caused by ConnectTimeoutError(<HTTPSConnection(host='www.praiagrande.sp.gov.br', port=443) at 0x7f34306e9b50>, 'Connection to www.praiagrande.sp.gov.br timed out. (connect timeout=25)'))"
   },
   "pg_diario": {
     "failures": 0,
