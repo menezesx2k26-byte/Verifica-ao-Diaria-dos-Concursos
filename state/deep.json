@@ -154,7 +154,7 @@
     "documents": {
       "https://anexos-r2.selecao.net.br/uploads/810/concursos/134/anexos/77a4a4c5-274e-4efe-bb06-acf1ef0ba31e.pdf": {
         "signature": "e756b1ee2defc6a1d1b489161b6f69b1d91c8f1276524ada923e7d4fcc085d56",
-        "checked_at": "2026-09-08T21:07:15+00:00",
+        "checked_at": "2026-09-08T23:22:20+00:00",
         "chars": 18317,
         "failures": 0,
         "label": "23 — Edital de Divulgação da Classificação Final",
@@ -177,7 +177,7 @@
       },
       "https://anexos-r2.selecao.net.br/uploads/810/concursos/134/anexos/f88b5ba9-d779-4130-af51-695b13e24dfc.pdf": {
         "signature": "e096a82736579b955103723777545ac6b699ff122c7c225a2fdcea7e4e5ec831",
-        "checked_at": "2026-09-08T21:07:15+00:00",
+        "checked_at": "2026-09-08T23:22:20+00:00",
         "chars": 1720,
         "failures": 0,
         "label": "24 — Despacho de Homologação Parcial",
@@ -199,38 +199,14 @@
         }
       }
     },
-    "checked_at": "2026-09-08T21:07:15+00:00"
+    "checked_at": "2026-09-08T23:22:20+00:00"
   },
   "sv_bom": {
     "label": "PMSV — Boletim Oficial",
     "documents": {
-      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-671-versaoimpressao-1.pdf/view": {
-        "signature": "c6975fd4f6b5a616f884b05a0a2131802e867e75d48463fc89772611d5e1c199",
-        "checked_at": "2026-09-08T04:31:12+00:00",
-        "chars": 255195,
-        "failures": 0,
-        "label": "documento conhecido",
-        "stage": null,
-        "seeded": false,
-        "semantic": {
-          "assistente_tecnico_gestao": true,
-          "agente_comunitario_saude": false,
-          "concurso_02_2026": true,
-          "concurso_004_2024": false,
-          "classificacao_final": false,
-          "homologacao": true,
-          "convocacao": false,
-          "nomeacao": true,
-          "posse": true,
-          "reclassificacao": false,
-          "source_match": true,
-          "priority_match": false
-        },
-        "content_url": "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-671-versaoimpressao-1.pdf"
-      },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-672-extra-versaoimpressao.pdf/view": {
         "signature": "cc31e5e464490cffbfb76982af9c8b1279bde232314dc3027470e1224e5dd8b5",
-        "checked_at": "2026-09-08T04:31:13+00:00",
+        "checked_at": "2026-09-08T23:22:25+00:00",
         "chars": 5135,
         "failures": 0,
         "label": "documento conhecido",
@@ -254,7 +230,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-673-versaoimpressao.pdf/view": {
         "signature": "28ba421ba4a23cd06311f558f8593d8d8b9b592d3ccd624b2c294daf1840c161",
-        "checked_at": "2026-09-08T04:31:17+00:00",
+        "checked_at": "2026-09-08T23:22:35+00:00",
         "chars": 207919,
         "failures": 0,
         "label": "documento conhecido",
@@ -278,7 +254,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-674-versaoimpressao.pdf/view": {
         "signature": "d0508ee10fc4eec1e2a86893fe83071180cf98f20e056fabc337f4fccca564ab",
-        "checked_at": "2026-09-08T04:31:23+00:00",
+        "checked_at": "2026-09-08T23:22:41+00:00",
         "chars": 203199,
         "failures": 0,
         "label": "documento conhecido",
@@ -302,7 +278,7 @@
       },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-675-extra-versaoimpressao.pdf/view": {
         "signature": "99f2ecbde944644e0d065b2e5d95c4cb94de42a1b6d2b64317a21600b3ae855e",
-        "checked_at": "2026-09-08T04:31:24+00:00",
+        "checked_at": "2026-09-08T23:22:43+00:00",
         "chars": 7277,
         "failures": 0,
         "label": "documento conhecido",
@@ -324,10 +300,34 @@
         },
         "content_url": "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-675-extra-versaoimpressao.pdf"
       },
+      "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-676-1-versaoimpressao.pdf/view": {
+        "signature": "d7d5c3a88573db4bf54117d243140c0e610045b8c5c6802da6f91038e71268bf",
+        "checked_at": "2026-09-08T23:22:51+00:00",
+        "chars": 152997,
+        "failures": 0,
+        "label": "documento conhecido",
+        "stage": null,
+        "seeded": false,
+        "semantic": {
+          "assistente_tecnico_gestao": true,
+          "agente_comunitario_saude": true,
+          "concurso_02_2026": false,
+          "concurso_004_2024": false,
+          "classificacao_final": false,
+          "homologacao": true,
+          "convocacao": true,
+          "nomeacao": true,
+          "posse": true,
+          "reclassificacao": false,
+          "source_match": false,
+          "priority_match": false
+        },
+        "content_url": "https://www.saovicente.sp.gov.br/transparencia/bom/bom-edicao-676-1-versaoimpressao.pdf"
+      },
       "https://www.saovicente.sp.gov.br/transparencia/bom/bom667/view": {
-        "signature": "6daae65d1a047a76455b0094718900d20a6100e6733c9971af9f4edfd602774e",
-        "checked_at": "2026-09-08T04:31:25+00:00",
-        "chars": 166129,
+        "signature": "3796c97a4f13f1ed6adbd78c6900ecfa9d7d45ecf2fe1fdc03ddc831c86e710d",
+        "checked_at": "2026-09-08T23:22:53+00:00",
+        "chars": 166342,
         "failures": 0,
         "label": "documento conhecido",
         "stage": null,
@@ -348,14 +348,14 @@
         }
       }
     },
-    "checked_at": "2026-09-08T04:31:25+00:00"
+    "checked_at": "2026-09-08T23:22:53+00:00"
   },
   "pg_diario": {
     "label": "PG — Diário Oficial Eletrônico",
     "documents": {
       "https://plenussistemas.dioenet.com.br/uploads/view/37185?utm_edicao=456_extra": {
         "signature": "28b43dcf49a647767bd6318fef8d0c7df627e18a3ac678ecd0e5fe338dc01f2d",
-        "checked_at": "2026-09-08T21:07:30+00:00",
+        "checked_at": "2026-09-08T23:23:07+00:00",
         "chars": 107149,
         "failures": 0,
         "label": "documento conhecido",
@@ -379,7 +379,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37194?utm_edicao=457": {
         "signature": "b5308199e416c9517ba1fa84555b60323db586721f2f2ae9cb3b4896a0ae25a9",
-        "checked_at": "2026-09-08T21:07:34+00:00",
+        "checked_at": "2026-09-08T23:23:11+00:00",
         "chars": 21500,
         "failures": 0,
         "label": "documento conhecido",
@@ -403,7 +403,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37215?utm_edicao=458": {
         "signature": "00420ad8ee426827d706ac8bf48c233c68a9185d9f83a4e59a257b667d682718",
-        "checked_at": "2026-09-08T21:07:47+00:00",
+        "checked_at": "2026-09-08T23:23:23+00:00",
         "chars": 77348,
         "failures": 0,
         "label": "documento conhecido",
@@ -427,7 +427,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37226?utm_edicao=459": {
         "signature": "8e458890a772be043d4948c1a23ff762bd95b55404185bd8a0dab1d0c1fa6986",
-        "checked_at": "2026-09-08T21:07:55+00:00",
+        "checked_at": "2026-09-08T23:23:31+00:00",
         "chars": 51457,
         "failures": 0,
         "label": "documento conhecido",
@@ -451,7 +451,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37236?utm_edicao=460_extra": {
         "signature": "93c906eee206f1da359b90a50df8918305a6bc7d644b8d1ccc4d98cb60b6b948",
-        "checked_at": "2026-09-08T21:08:04+00:00",
+        "checked_at": "2026-09-08T23:23:40+00:00",
         "chars": 74303,
         "failures": 0,
         "label": "documento conhecido",
@@ -475,7 +475,7 @@
       },
       "https://plenussistemas.dioenet.com.br/uploads/view/37244?utm_edicao=461": {
         "signature": "223dfd3bb7a0392f198c8702fe5bc0b6ca64e23dc201966b3d0e518bd77fd31e",
-        "checked_at": "2026-09-08T21:08:11+00:00",
+        "checked_at": "2026-09-08T23:23:46+00:00",
         "chars": 41607,
         "failures": 0,
         "label": "documento conhecido",
@@ -498,11 +498,11 @@
         "content_url": "https://plenussistemas.dioenet.com.br/public/uploads/diarios/2026/09/0a5e4d3a75ac6ac1f3e2e5dd2a14321a.pdf"
       }
     },
-    "checked_at": "2026-09-08T21:08:11+00:00"
+    "checked_at": "2026-09-08T23:23:46+00:00"
   },
   "_meta": {
     "audit_version": 7,
-    "checked_at": "2026-09-08T21:08:11+00:00",
+    "checked_at": "2026-09-08T23:23:46+00:00",
     "sources": 4,
     "seeded_documents_checked": 2,
     "failures": 0,
