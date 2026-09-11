@@ -96,10 +96,19 @@
     "failures": 0,
     "resolved_url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187",
     "last_status": 200,
-    "context_sigs": [],
-    "context_count": 0,
-    "document_urls": [],
-    "document_count": 0,
+    "context_sigs": [
+      "09135822ffd010939e9d9550621dc7bd5b695912813071c32dea50304bbd49c8",
+      "2c197fe774bb4a528591d52f835018544f7fda7ec9c9c7df7aae551cb7a16ac8",
+      "c725974dcee00330bf6042cfe5855584b9e89fc9f3f84f1991a7c720c2c5bedd",
+      "da9ce7392b25e0e802aa499eaab2c2acf6a41edc1501d6a7a458f39ae6d21a61",
+      "ddbb69dc55a1e4a7011b197f7ac2c8cd5b743ba22455b9afe5a4dc986f20371a",
+      "fc3a6702c1547cecacb83c5c4c1755d02afb5b84bcb7c3f3b955b3f3e16adb51"
+    ],
+    "context_count": 6,
+    "document_urls": [
+      "https://www.praiagrande.sp.gov.br/arquivos/concurso/3417.pdf"
+    ],
+    "document_count": 1,
     "parser_version": 4,
     "transport": "direct",
     "last_ok": "2026-09-10T09:39:03+00:00",
@@ -111,7 +120,6 @@
     "resolved_url": "https://plenussistemas.dioenet.com.br/list/praia-grande",
     "last_status": 200,
     "document_urls": [
-      "https://plenussistemas.dioenet.com.br/uploads/view/37177?utm_edicao=455",
       "https://plenussistemas.dioenet.com.br/uploads/view/37185?utm_edicao=456_extra",
       "https://plenussistemas.dioenet.com.br/uploads/view/37194?utm_edicao=457",
       "https://plenussistemas.dioenet.com.br/uploads/view/37215?utm_edicao=458",
@@ -120,7 +128,8 @@
       "https://plenussistemas.dioenet.com.br/uploads/view/37244?utm_edicao=461",
       "https://plenussistemas.dioenet.com.br/uploads/view/37264?utm_edicao=462",
       "https://plenussistemas.dioenet.com.br/uploads/view/37290?utm_edicao=463",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37300?utm_edicao=464_extra"
+      "https://plenussistemas.dioenet.com.br/uploads/view/37300?utm_edicao=464_extra",
+      "https://plenussistemas.dioenet.com.br/uploads/view/37313?utm_edicao=465"
     ],
     "document_count": 10,
     "context_sigs": [],
