@@ -97,13 +97,13 @@
     "resolved_url": "https://www.praiagrande.sp.gov.br/administracao/concurso_publico.asp?cd_pagina=187",
     "last_status": 200,
     "context_sigs": [
-      "1fb9602b5b13eba104c1455d4bf1b6503bc8939a71a44b5a2d9d5800bc7f74c8",
-      "3e1cbf809a98a4db73f72e77a1688e0b2e7019c3ae65a11cf71a9dbea70f70cd",
-      "42f0a844e982b65491123e8d5149a4c7b36436331a4f8d5c7cbfedecfef41548",
-      "5b8173960ca9cdf36ca4e3a6ae73fd445af7b3db2a736ca1b4c34ea100b6fba5",
-      "6d27c7a77246f5bb308c0e11c244d96a92e17cda527656d8d920ed6ba3eac025",
-      "77bb2d0c0759178d11bb35b7a5cd9cc336c416905545a66114dfabc40822baff",
-      "eeec2b41aa403663fe3ed8369334a57cb9953db3156bd2dc65a1572e25160813"
+      "041a39c260fe8df8dea4550f81af9ad7902fc169a52844e630066ce1ac0b7873",
+      "5dc6f3621be80522758382e574c0daf390b98bdf4a9cbc4822c086b474f719fe",
+      "9834822f0f07c106ce20cf1964051a4590017d69cbc13cd02976a856b401a0b0",
+      "98bdd184e66d3f6ce630e95a39c2a80eda5ad66409e792cacef1ec1734c056a2",
+      "b58240b745f010228cf3f64f8cba3854d4d45e6a1c8ab987efee7f653cd7f4a2",
+      "eeec2b41aa403663fe3ed8369334a57cb9953db3156bd2dc65a1572e25160813",
+      "f4cf1ace878dc83133645354978d20bc0f1291e25017f59118579bae0ee1e603"
     ],
     "context_count": 7,
     "document_urls": [
@@ -121,7 +121,6 @@
     "resolved_url": "https://plenussistemas.dioenet.com.br/list/praia-grande",
     "last_status": 200,
     "document_urls": [
-      "https://plenussistemas.dioenet.com.br/uploads/view/37194?utm_edicao=457",
       "https://plenussistemas.dioenet.com.br/uploads/view/37215?utm_edicao=458",
       "https://plenussistemas.dioenet.com.br/uploads/view/37226?utm_edicao=459",
       "https://plenussistemas.dioenet.com.br/uploads/view/37236?utm_edicao=460_extra",
@@ -130,7 +129,8 @@
       "https://plenussistemas.dioenet.com.br/uploads/view/37290?utm_edicao=463",
       "https://plenussistemas.dioenet.com.br/uploads/view/37300?utm_edicao=464_extra",
       "https://plenussistemas.dioenet.com.br/uploads/view/37313?utm_edicao=465",
-      "https://plenussistemas.dioenet.com.br/uploads/view/37327?utm_edicao=466"
+      "https://plenussistemas.dioenet.com.br/uploads/view/37327?utm_edicao=466",
+      "https://plenussistemas.dioenet.com.br/uploads/view/37343?utm_edicao=467"
     ],
     "document_count": 10,
     "context_sigs": [],
